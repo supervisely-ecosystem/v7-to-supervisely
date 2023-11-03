@@ -52,6 +52,8 @@ class State:
         # V7 credentials to access the API.
         self.v7_api_key = None
 
+        self.project_names = {}
+
         # Will be set to False if the cancel button will be pressed.
         # Sets to True on every click on the "Copy" button.
         self.continue_copying = True

@@ -48,6 +48,7 @@ def connected() -> None:
 
     sly.logger.debug("Status changed to connected, will change widget states.")
     v7_api_key_input.disable()
+    connect_button.disable()
 
     selection.card.unlock()
     selection.card.uncollapse()
@@ -72,6 +73,7 @@ def disconnected(with_error=False) -> None:
         f"Status changed to disconnected with error: {with_error}, will change widget states."
     )
     v7_api_key_input.enable()
+    connect_button.enable()
 
     card.uncollapse()
     selection.card.lock()

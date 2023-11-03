@@ -4,8 +4,7 @@ from supervisely.app.widgets import Card, Transfer, Button, Container
 
 import migration_tool.src.globals as g
 import migration_tool.src.ui.copying as copying
-
-# from migration_tool.src.cvat_api import cvat_data
+from migration_tool.src.v7_api import get_datasets
 
 projects_transfer = Transfer(
     filterable=True,
@@ -20,7 +19,7 @@ change_selection_button.hide()
 
 card = Card(
     title="2️⃣ Selection",
-    description="Select projects to copy from CVAT to Supervisely.",
+    description="Select projects to copy from V7 to Supervisely.",
     content=Container([projects_transfer, select_projects_button]),
     content_top_right=change_selection_button,
     collapsable=True,
@@ -30,16 +29,18 @@ card.collapse()
 
 
 def fill_transfer_with_projects() -> None:
-    """Fills the transfer widget with projects sorted by id from CVAT API.
+    """Fills the transfer widget with projects sorted by id from V7 API.
     On every launch clears the items in the widget and fills it with new projects."""
 
     sly.logger.debug("Starting to build transfer widget with projects.")
     transfer_items = []
 
-    for project in cvat_data():
-        g.STATE.project_names[project.id] = project.name
+    for dataset in get_datasets():
+        g.STATE.project_names[dataset.dataset_id] = dataset.name
         transfer_items.append(
-            Transfer.Item(key=project.id, label=f"[{project.id}] {project.name}")
+            Transfer.Item(
+                key=dataset.dataset_id, label=f"[{dataset.dataset_id}] {dataset.name}"
+            )
         )
 
     sly.logger.debug(f"Prepared {len(transfer_items)} items for transfer.")

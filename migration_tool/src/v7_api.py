@@ -2,9 +2,10 @@
 
 # from rich.console import Console
 from darwin.client import Client
-from typing import Union
+from typing import Union, List
 import supervisely as sly
 from darwin.exceptions import InvalidLogin, NameTaken
+from darwin.dataset.remote_dataset_v2 import RemoteDatasetV2
 
 import migration_tool.src.globals as g
 
@@ -30,7 +31,7 @@ def get_configurtation() -> Union[None, Client]:
         return
 
 
-def get_datasets():
+def get_datasets() -> List[RemoteDatasetV2]:
     client = get_configurtation()
     if client is None:
         return
@@ -38,7 +39,7 @@ def get_datasets():
     for dataset in client.list_remote_datasets():
         datasets.append(dataset)
 
-    print(type(datasets[0]))
+    print(dir(datasets[0]))
     return datasets
 
 
