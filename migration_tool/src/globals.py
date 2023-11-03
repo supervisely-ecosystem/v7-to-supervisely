@@ -31,10 +31,10 @@ sly.logger.debug(f"SLY_APP_DATA_DIR: {SLY_APP_DATA_DIR}")
 
 TEMP_DIR = os.path.join(SLY_APP_DATA_DIR, "temp")
 
-# * Directory, where downloaded as archives CVAT tasks will be stored.
+# * Directory, where downloaded as archives V7 datasets will be stored.
 ARCHIVE_DIR = os.path.join(TEMP_DIR, "archives")
 
-# * Directory, where unpacked CVAT tasks will be stored.
+# * Directory, where unpacked V7 datasets will be stored.
 UNPACKED_DIR = os.path.join(TEMP_DIR, "unpacked")
 sly.fs.mkdir(ARCHIVE_DIR, remove_content_if_exists=True)
 sly.fs.mkdir(UNPACKED_DIR, remove_content_if_exists=True)
@@ -49,48 +49,32 @@ class State:
         # Will be set to True, if the app will be launched from .env file in Supervisely.
         self.loaded_from_env = False
 
-        # CVAT credentials to access the API.
-        self.cvat_server_address = None
-        self.cvat_username = None
-        self.cvat_password = None
-
-        # Dictionary with project_ids as keys and project_names as values.
-        # Example: {1: "project1", 2: "project2", 3: "project3"}
-        self.project_names = dict()
-
-        # List of selected project ids to copy.
-        # Example: [1, 2, 3]
-        self.selected_projects = None
+        # V7 credentials to access the API.
+        self.v7_api_key = None
 
         # Will be set to False if the cancel button will be pressed.
         # Sets to True on every click on the "Copy" button.
         self.continue_copying = True
 
-    def clear_cvat_credentials(self):
-        """Clears the CVAT credentials and sets them to None."""
+    def clear_v7_credentials(self):
+        """Clears the V7 credentials and sets them to None."""
 
         sly.logger.debug("Clearing CVAT credentials...")
-        self.cvat_server_address = None
-        self.cvat_username = None
-        self.cvat_password = None
+        self.v7_api_key = None
 
     def load_from_env(self):
-        """Downloads the .env file from Supervisely and reads the CVAT credentials from it."""
+        """Downloads the .env file from Supervisely and reads the V7 credentials from it."""
 
-        api.file.download(STATE.selected_team, CVAT_ENV_TEAMFILES, CVAT_ENV_FILE)
+        api.file.download(STATE.selected_team, V7_ENV_TEAMFILES, V7_ENV_FILE)
         sly.logger.debug(
             ".env file downloaded successfully. Will read the credentials."
         )
 
-        load_dotenv(CVAT_ENV_FILE)
+        load_dotenv(V7_ENV_FILE)
 
-        self.cvat_server_address = os.getenv("CVAT_SERVER_ADDRESS")
-        self.cvat_username = os.getenv("CVAT_USERNAME")
-        self.cvat_password = os.getenv("CVAT_PASSWORD")
+        self.v7_api_key = os.getenv("V7_API_KEY")
         sly.logger.debug(
-            "CVAT credentials readed successfully. "
-            f"Server address: {STATE.cvat_server_address}, username: {STATE.cvat_username}. "
-            "Will check the connection."
+            "V7 credentials readed successfully. Will check the connection."
         )
         self.loaded_from_env = True
 
@@ -101,17 +85,17 @@ sly.logger.debug(
 )
 
 # * Local path to the .env file with credentials, after downloading it from Supervisely.
-CVAT_ENV_FILE = os.path.join(PARENT_DIR, "cvat.env")
-sly.logger.debug(f"Path to the local cvat.env file: {CVAT_ENV_FILE}")
+V7_ENV_FILE = os.path.join(PARENT_DIR, "v7.env")
+sly.logger.debug(f"Path to the local v7.env file: {V7_ENV_FILE}")
 
 # * Path to the .env file with credentials (on Team Files).
-# While local development can be set in local.env file with: context.slyFile = "/.env/cvat.env"
-CVAT_ENV_TEAMFILES = sly.env.file(raise_not_found=False)
-sly.logger.debug(f"Path to the TeamFiles from environment: {CVAT_ENV_TEAMFILES}")
+# While local development can be set in local.env file with: context.slyFile = "/.env/v7.env"
+V7_ENV_TEAMFILES = sly.env.file(raise_not_found=False)
+sly.logger.debug(f"Path to the TeamFiles from environment: {V7_ENV_TEAMFILES}")
 
 CopyingStatus = namedtuple("CopyingStatus", ["copied", "error", "waiting", "working"])
 COPYING_STATUS = CopyingStatus("✅ Copied", "❌ Error", "⏳ Waiting", "🔄 Working")
 
-if CVAT_ENV_TEAMFILES:
+if V7_ENV_TEAMFILES:
     sly.logger.debug(".env file is provided, will try to download it.")
     STATE.load_from_env()

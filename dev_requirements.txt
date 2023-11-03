@@ -1,2 +1,2 @@
-supervisely==6.72.125
-darwin-py==0.8.47
+darwin-py
+supervisely

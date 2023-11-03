@@ -15,7 +15,7 @@ from supervisely.app.widgets import (
 )
 import xml.etree.ElementTree as ET
 
-from migration_tool.src.cvat_api import cvat_data, retreive_dataset
+# from migration_tool.src.cvat_api import cvat_data, retreive_dataset
 from import_cvat.src.converters import (
     convert_images_annotations,
     convert_video_annotations,
