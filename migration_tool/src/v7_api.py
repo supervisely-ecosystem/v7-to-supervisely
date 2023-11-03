@@ -18,6 +18,8 @@ import migration_tool.src.globals as g
 # DATASET_DIR = "datasets"
 # os.makedirs(DATASET_DIR, exist_ok=True)
 
+DEFAULT_DATASET_ADDRESS = "https://darwin.v7labs.com/datasets"
+
 
 def get_configurtation() -> Union[None, Client]:
     try:
@@ -38,9 +40,11 @@ def get_datasets() -> List[RemoteDatasetV2]:
     datasets = []
     for dataset in client.list_remote_datasets():
         datasets.append(dataset)
-
-    print(dir(datasets[0]))
     return datasets
+
+
+def get_dataset_url(dataset_id: int) -> str:
+    return f"{DEFAULT_DATASET_ADDRESS}/{dataset_id}/"
 
 
 # for dataset in client.list_remote_datasets():

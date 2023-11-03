@@ -3,7 +3,7 @@ import shutil
 import supervisely as sly
 from typing import List, Tuple, Union
 from time import sleep
-
+from darwin.dataset.remote_dataset_v2 import RemoteDatasetV2
 from supervisely.app.widgets import (
     Container,
     Card,
@@ -14,16 +14,16 @@ from supervisely.app.widgets import (
     Flexbox,
 )
 import xml.etree.ElementTree as ET
+from migration_tool.src.v7_api import get_datasets, get_dataset_url
 
-# from migration_tool.src.cvat_api import cvat_data, retreive_dataset
-from import_cvat.src.converters import (
-    convert_images_annotations,
-    convert_video_annotations,
-    prepare_images_for_upload,
-    upload_images_task,
-    update_project_meta,
-    images_to_mp4,
-)
+# from import_cvat.src.converters import (
+#     convert_images_annotations,
+#     convert_video_annotations,
+#     prepare_images_for_upload,
+#     upload_images_task,
+#     update_project_meta,
+#     images_to_mp4,
+# )
 import migration_tool.src.globals as g
 
 
@@ -31,10 +31,8 @@ COLUMNS = [
     "COPYING STATUS",
     "ID",
     "NAME",
-    "STATUS",
-    "OWNER",
-    "LABELS",
-    "CVAT URL",
+    "ITEM COUNT",
+    "V7 URL",
     "SUPERVISELY URL",
 ]
 
@@ -55,7 +53,7 @@ bad_results.hide()
 
 card = Card(
     title="3️⃣ Copying",
-    description="Copy selected projects from CVAT to Supervisely.",
+    description="Copy selected projects from V7 to Supervisely.",
     content=Container(
         [projects_table, buttons_flexbox, copying_progress, good_results, bad_results]
     ),
@@ -66,25 +64,25 @@ card.collapse()
 
 
 def build_projects_table() -> None:
-    """Fills the table with projects from CVAT.
+    """Fills the table with projects from V7.
     Uses global g.STATE.selected_projects to get the list of projects to show.
-    g.STATE.selected_projects is a list of project IDs from CVAT.
+    g.STATE.selected_projects is a list of project IDs from V7.
     """
     sly.logger.debug("Building projects table...")
     projects_table.loading = True
     rows = []
 
-    for project in cvat_data():
-        if project.id in g.STATE.selected_projects:
+    for dataset in get_datasets():
+        dataset: RemoteDatasetV2
+        if dataset.dataset_id in g.STATE.selected_projects:
+            dataset_url = get_dataset_url(dataset.dataset_id)
             rows.append(
                 [
                     g.COPYING_STATUS.waiting,
-                    project.id,
-                    project.name,
-                    project.status,
-                    project.owner_username,
-                    project.labels_count,
-                    f'<a href="{project.url}" target="_blank">{project.url}</a>',
+                    dataset.dataset_id,
+                    dataset.name,
+                    dataset.item_count,
+                    f'<a href="{dataset_url}" target="_blank">{dataset_url}</a>',
                     "",
                 ]
             )
