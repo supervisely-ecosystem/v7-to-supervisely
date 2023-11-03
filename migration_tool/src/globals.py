@@ -29,14 +29,14 @@ api: sly.Api = sly.Api.from_env()
 
 TEMP_DIR = os.path.join(PARENT_DIR, "temp")
 
-# * Directory, where downloaded as archives V7 datasets will be stored.
-ARCHIVE_DIR = os.path.join(TEMP_DIR, "archives")
+# * Directory, where downloaded V7 datasets will be stored.
+DOWNLOAD_DIR = os.path.join(TEMP_DIR, "downloads")
 
-# * Directory, where unpacked V7 datasets will be stored.
-UNPACKED_DIR = os.path.join(TEMP_DIR, "unpacked")
-sly.fs.mkdir(ARCHIVE_DIR, remove_content_if_exists=True)
-sly.fs.mkdir(UNPACKED_DIR, remove_content_if_exists=True)
-sly.logger.debug(f"Archive dir: {ARCHIVE_DIR}, unpacked dir: {UNPACKED_DIR}")
+# * Directory, where prepared V7 datasets will be stored.
+PREPARED_DIR = os.path.join(TEMP_DIR, "prepared")
+sly.fs.mkdir(DOWNLOAD_DIR, remove_content_if_exists=True)
+sly.fs.mkdir(PREPARED_DIR, remove_content_if_exists=True)
+sly.logger.debug(f"Download dir: {DOWNLOAD_DIR}, prepared dir: {PREPARED_DIR}")
 
 
 class State:

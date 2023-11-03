@@ -124,18 +124,16 @@ def start_copying() -> None:
     8. Stops the application (if not in development mode).
     """
     sly.logger.debug(
-        f"Copying button is clicked. Selected projects: {g.STATE.selected_projects}"
+        f"Copying button is clicked. Selected datasets: {g.STATE.selected_datasets}"
     )
 
     stop_button.show()
     copy_button.text = "Copying..."
     g.STATE.continue_copying = True
 
-    def save_dataset_to_zip(
-        dataset: RemoteDatasetV2, retry: int = 0
-    ) -> Union[None, str]:
+    def save_dataset(dataset: RemoteDatasetV2, retry: int = 0) -> Union[None, str]:
         sly.logger.info("Trying to retreive dataset data from V7 API...")
-        archive_path = retreive_dataset(task_id=task.id)
+        archive_path = retreive_dataset(dataset)
         if archive_path is None:
             sly.logger.info(
                 f"Can not retreive dataset data from V7 API for dataset {dataset.name}"
@@ -153,7 +151,7 @@ def start_copying() -> None:
                     timer -= 1
 
                 sly.logger.info(f"Retry {retry} to download dataset {dataset.name}...")
-                save_dataset_to_zip(dataset, retry)
+                save_dataset(dataset, retry)
             else:
                 # If the archive is empty after 10 retries, return False.
                 sly.logger.warning(
@@ -168,78 +166,82 @@ def start_copying() -> None:
     uploded_with_errors = 0
 
     with copying_progress(
-        total=len(g.STATE.selected_projects), message="Copying..."
+        total=len(g.STATE.selected_datasets), message="Copying..."
     ) as pbar:
-        for project_id in g.STATE.selected_projects:
-            project = g.STATE.projects[project_id]
+        for dataset_id in g.STATE.selected_datasets:
+            dataset = g.STATE.datasets[dataset_id]
             sly.logger.debug(
-                f"Copying project with id: {project_id} and name: {project.name}"
+                f"Copying project with id: {dataset_id} and name: {dataset.name}"
             )
-            update_cells(project_id, new_status=g.COPYING_STATUS.working)
+            update_cells(dataset_id, new_status=g.COPYING_STATUS.working)
 
-            task_ids_with_errors = []
-            task_archive_paths = []
+            archive_path = save_dataset(dataset)
+            if not archive_path:
+                pass
 
-            for task in cvat_data(project_id=project_id):
-                data_type = task.data_type
+            # task_ids_with_errors = []
+            # task_archive_paths = []
 
-                sly.logger.debug(
-                    f"Copying task with id: {task.id}, data type: {data_type}"
-                )
-                if not g.STATE.continue_copying:
-                    sly.logger.debug("Copying is stopped by the user.")
-                    continue
+            # for task in cvat_data(project_id=project_id):
+            #     data_type = task.data_type
 
-                project_name = g.STATE.project_names[project_id]
-                project_dir = os.path.join(
-                    g.ARCHIVE_DIR, f"{project_id}_{project_name}_{data_type}"
-                )
-                sly.fs.mkdir(project_dir)
-                task_filename = f"{task.id}_{task.name}_{data_type}.zip"
+            #     sly.logger.debug(
+            #         f"Copying task with id: {task.id}, data type: {data_type}"
+            #     )
+            #     if not g.STATE.continue_copying:
+            #         sly.logger.debug("Copying is stopped by the user.")
+            #         continue
 
-                task_path = os.path.join(project_dir, task_filename)
-                download_status = save_task_to_zip(task.id, task_path)
-                if download_status is False:
-                    task_ids_with_errors.append(task.id)
-                else:
-                    task_archive_paths.append((task_path, data_type))
+            #     project_name = g.STATE.project_names[project_id]
+            #     project_dir = os.path.join(
+            #         g.ARCHIVE_DIR, f"{project_id}_{project_name}_{data_type}"
+            #     )
+            #     sly.fs.mkdir(project_dir)
+            #     task_filename = f"{task.id}_{task.name}_{data_type}.zip"
 
-            if not task_archive_paths:
-                sly.logger.warning(
-                    f"No tasks was successfully downloaded for project ID {project_id}. It will be skipped."
-                )
-                new_status = g.COPYING_STATUS.error
-                uploded_with_errors += 1
-            else:
-                upload_status = convert_and_upload(
-                    project_id, project_name, task_archive_paths
-                )
+            #     task_path = os.path.join(project_dir, task_filename)
+            #     download_status = save_task_to_zip(task.id, task_path)
+            #     if download_status is False:
+            #         task_ids_with_errors.append(task.id)
+            #     else:
+            #         task_archive_paths.append((task_path, data_type))
 
-                if task_ids_with_errors:
-                    sly.logger.warning(
-                        f"Project ID {project_id} was downloaded with errors. "
-                        "Task IDs with errors: {task_ids_with_errors}."
-                    )
-                    new_status = g.COPYING_STATUS.error
-                    uploded_with_errors += 1
-                elif not upload_status:
-                    sly.logger.warning(
-                        f"Project ID {project_id} was uploaded with errors."
-                    )
-                    new_status = g.COPYING_STATUS.error
-                    uploded_with_errors += 1
-                else:
-                    sly.logger.info(
-                        f"Project ID {project_id} was downloaded successfully."
-                    )
-                    new_status = g.COPYING_STATUS.copied
-                    succesfully_uploaded += 1
+            # if not task_archive_paths:
+            #     sly.logger.warning(
+            #         f"No tasks was successfully downloaded for project ID {project_id}. It will be skipped."
+            #     )
+            #     new_status = g.COPYING_STATUS.error
+            #     uploded_with_errors += 1
+            # else:
+            #     upload_status = convert_and_upload(
+            #         project_id, project_name, task_archive_paths
+            #     )
 
-            update_cells(project_id, new_status=new_status)
+            #     if task_ids_with_errors:
+            #         sly.logger.warning(
+            #             f"Project ID {project_id} was downloaded with errors. "
+            #             "Task IDs with errors: {task_ids_with_errors}."
+            #         )
+            #         new_status = g.COPYING_STATUS.error
+            #         uploded_with_errors += 1
+            #     elif not upload_status:
+            #         sly.logger.warning(
+            #             f"Project ID {project_id} was uploaded with errors."
+            #         )
+            #         new_status = g.COPYING_STATUS.error
+            #         uploded_with_errors += 1
+            #     else:
+            #         sly.logger.info(
+            #             f"Project ID {project_id} was downloaded successfully."
+            #         )
+            #         new_status = g.COPYING_STATUS.copied
+            #         succesfully_uploaded += 1
 
-            sly.logger.info(f"Finished processing project ID {project_id}.")
+            # update_cells(project_id, new_status=new_status)
 
-            pbar.update(1)
+            # sly.logger.info(f"Finished processing project ID {project_id}.")
+
+            # pbar.update(1)
 
     if succesfully_uploaded:
         good_results.text = f"Succesfully uploaded {succesfully_uploaded} projects."
@@ -251,7 +253,7 @@ def start_copying() -> None:
     copy_button.text = "Copy"
     stop_button.hide()
 
-    sly.logger.info(f"Finished copying {len(g.STATE.selected_projects)} projects.")
+    sly.logger.info(f"Finished copying {len(g.STATE.selected_datasets)} projects.")
 
     if sly.is_development():
         # * For debug purposes it's better to save the data from V7.
@@ -261,11 +263,11 @@ def start_copying() -> None:
         )
         return
 
-    sly.fs.clean_dir(g.ARCHIVE_DIR)
-    sly.fs.clean_dir(g.UNPACKED_DIR)
+    sly.fs.clean_dir(g.DOWNLOAD_DIR)
+    sly.fs.clean_dir(g.PREPARED_DIR)
 
     sly.logger.info(
-        f"Removed content from {g.ARCHIVE_DIR} and {g.UNPACKED_DIR}."
+        f"Removed content from {g.DOWNLOAD_DIR} and {g.PREPARED_DIR}."
         "Will stop the application."
     )
 
@@ -564,7 +566,7 @@ def update_cells(project_id: int, **kwargs) -> None:
             old_value += "<br>"
         new_value = old_value + f"<a href='{url}' target='_blank'>{url}</a>"
 
-    projects_table.update_cell_value(
+    datasets_table.update_cell_value(
         key_column_name, key_cell_value, column_name, new_value
     )
 
@@ -582,7 +584,7 @@ def get_cell_value(
     :return: value of the cell in the projects table or None if not found
     :rtype: Union[str, None]
     """
-    table_json_data = projects_table.get_json_data()["table_data"]
+    table_json_data = datasets_table.get_json_data()["table_data"]
 
     # Find column index by column name.
     cell_column_idx = None

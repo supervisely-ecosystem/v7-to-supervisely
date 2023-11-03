@@ -1,3 +1,4 @@
+import os
 from darwin.client import Client
 from typing import Union, List
 import supervisely as sly
@@ -15,8 +16,8 @@ def get_configurtation() -> Union[None, Client]:
     try:
         client = Client.from_api_key(g.STATE.v7_api_key)
         sly.logger.debug("Successfully logged in V7 API.")
-        client.set_datasets_dir(g.ARCHIVE_DIR)
-        sly.logger.debug(f"Datasets dir set to: {g.ARCHIVE_DIR}")
+        client.set_datasets_dir(g.DOWNLOAD_DIR)
+        sly.logger.debug(f"Datasets dir set to: {g.DOWNLOAD_DIR}")
         return client
     except InvalidLogin:
         sly.logger.error("Can not connect with provided API key.")
@@ -55,7 +56,12 @@ def retreive_dataset(dataset: RemoteDatasetV2) -> Union[None, str]:
             sly.logger.info(f"Image count: {release.image_count}")
             dataset.pull(release=release, multi_threaded=False, use_folders=True)
 
-            return get_export_path()
+            export_path = get_export_path(dataset)
+            sly.logger.info(f"Export path of dataset {dataset.name}: {export_path}")
+            if not os.path.isdir(export_path):
+                sly.logger.error(f"Can't find downloaded dataset in {export_path}")
+                return
+            return export_path
         except NotFound:
             sly.logger.warning(f"Can't find any release for dataset {dataset.name}")
             return
@@ -66,8 +72,8 @@ def get_export_name():
     return f"sly_export_{timestamp}"
 
 
-def get_export_path():
-    pass
+def get_export_path(dataset: RemoteDatasetV2) -> str:
+    return os.path.join(g.DOWNLOAD_DIR, dataset.team, dataset.name)
 
 
 # for dataset in client.list_remote_datasets():
