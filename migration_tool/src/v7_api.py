@@ -1,22 +1,12 @@
-# import os
-
-# from rich.console import Console
 from darwin.client import Client
 from typing import Union, List
 import supervisely as sly
-from darwin.exceptions import InvalidLogin, NameTaken
+from darwin.exceptions import InvalidLogin, NameTaken, NotFound
+from datetime import datetime
 from darwin.dataset.remote_dataset_v2 import RemoteDatasetV2
 
 import migration_tool.src.globals as g
 
-# console = Console()
-
-# API_KEY = "JUFxKUH.wfjargM-xR4-L3wR2kkZaxFM-AqTiZWs"
-# TEAM_NAME = "tkotteam001"
-# EXPORT_NAME = "export_2"
-# SAVE_PATH = "data.zip"
-# DATASET_DIR = "datasets"
-# os.makedirs(DATASET_DIR, exist_ok=True)
 
 DEFAULT_DATASET_ADDRESS = "https://darwin.v7labs.com/datasets"
 
@@ -45,6 +35,39 @@ def get_datasets() -> List[RemoteDatasetV2]:
 
 def get_dataset_url(dataset_id: int) -> str:
     return f"{DEFAULT_DATASET_ADDRESS}/{dataset_id}/"
+
+
+def retreive_dataset(dataset: RemoteDatasetV2) -> Union[None, str]:
+    export_name = get_export_name()
+    sly.logger.info(f"Will try to export dataset {dataset.name} to {export_name}")
+    try:
+        dataset.export(export_name)
+        sly.logger.info(
+            f"Export {export_name} created successfully, it may take a while "
+            "before the export will be available for download."
+        )
+    except NameTaken:
+        sly.logger.info(f"Export {get_export_name()} already exists")
+    finally:
+        try:
+            release = dataset.get_release()
+            sly.logger.info("Release was retreived successfully.")
+            sly.logger.info(f"Image count: {release.image_count}")
+            dataset.pull(release=release, multi_threaded=False, use_folders=True)
+
+            return get_export_path()
+        except NotFound:
+            sly.logger.warning(f"Can't find any release for dataset {dataset.name}")
+            return
+
+
+def get_export_name():
+    timestamp = datetime.now().strftime("%Y-%m-%d")
+    return f"sly_export_{timestamp}"
+
+
+def get_export_path():
+    pass
 
 
 # for dataset in client.list_remote_datasets():

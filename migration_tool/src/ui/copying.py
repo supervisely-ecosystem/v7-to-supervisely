@@ -14,7 +14,7 @@ from supervisely.app.widgets import (
     Flexbox,
 )
 import xml.etree.ElementTree as ET
-from migration_tool.src.v7_api import get_datasets, get_dataset_url
+from migration_tool.src.v7_api import get_datasets, get_dataset_url, retreive_dataset
 
 # from import_cvat.src.converters import (
 #     convert_images_annotations,
@@ -36,8 +36,8 @@ COLUMNS = [
     "SUPERVISELY URL",
 ]
 
-projects_table = Table(fixed_cols=3, per_page=20, sort_column_id=1)
-projects_table.hide()
+datasets_table = Table(fixed_cols=3, per_page=20, sort_column_id=1)
+datasets_table.hide()
 
 copy_button = Button("Copy", icon="zmdi zmdi-copy")
 stop_button = Button("Stop", icon="zmdi zmdi-stop", button_type="danger")
@@ -53,9 +53,9 @@ bad_results.hide()
 
 card = Card(
     title="3️⃣ Copying",
-    description="Copy selected projects from V7 to Supervisely.",
+    description="Copy selected datasets from V7 to Supervisely.",
     content=Container(
-        [projects_table, buttons_flexbox, copying_progress, good_results, bad_results]
+        [datasets_table, buttons_flexbox, copying_progress, good_results, bad_results]
     ),
     collapsable=True,
 )
@@ -63,18 +63,18 @@ card.lock()
 card.collapse()
 
 
-def build_projects_table() -> None:
-    """Fills the table with projects from V7.
-    Uses global g.STATE.selected_projects to get the list of projects to show.
-    g.STATE.selected_projects is a list of project IDs from V7.
+def build_datasets_table() -> None:
+    """Fills the table with datasets from V7.
+    Uses global g.STATE.selected_datasets to get the list of datasets to show.
+    g.STATE.selected_datasets is a list of dataset IDs from V7.
     """
-    sly.logger.debug("Building projects table...")
-    projects_table.loading = True
+    sly.logger.debug("Building datasets table...")
+    datasets_table.loading = True
     rows = []
 
     for dataset in get_datasets():
         dataset: RemoteDatasetV2
-        if dataset.dataset_id in g.STATE.selected_projects:
+        if dataset.dataset_id in g.STATE.selected_datasets:
             dataset_url = get_dataset_url(dataset.dataset_id)
             rows.append(
                 [
@@ -89,29 +89,29 @@ def build_projects_table() -> None:
 
     sly.logger.debug(f"Prepared {len(rows)} rows for the projects table.")
 
-    projects_table.read_json(
+    datasets_table.read_json(
         {
             "columns": COLUMNS,
             "data": rows,
         }
     )
 
-    projects_table.loading = False
-    projects_table.show()
+    datasets_table.loading = False
+    datasets_table.show()
 
-    sly.logger.debug("Projects table is built.")
+    sly.logger.debug("Datasets table is built.")
 
 
 @copy_button.click
 def start_copying() -> None:
-    """Main function for copying projects from CVAT to Supervisely.
+    """Main function for copying projects from V7 to Supervisely.
     1. Starts copying progress, changes state of widgets in UI.
-    2. Iterates over selected projects from CVAT.
+    2. Iterates over selected projects from V7.
     3. For each project:
         3.1. Updates the status in the projects table to "Copying...".
         3.2. Iterates over tasks in the project.
         3.3. For each task:
-            3.3.1. Downloads the task data from CVAT API.
+            3.3.1. Downloads the task data from V7 API.
             3.3.2. Saves the task data to the zip archive (using up to 10 retries).
         3.4. If the archive is empty after 10 retries, updates the status in the projects table to "Error".
         3.5. Otherwise converts the task data to Supervisely format and uploads it to Supervisely.
@@ -131,35 +131,17 @@ def start_copying() -> None:
     copy_button.text = "Copying..."
     g.STATE.continue_copying = True
 
-    def save_task_to_zip(task_id: int, task_path: str, retry: int = 0) -> bool:
-        """Tries to download the task data from CVAT API and save it to the zip archive.
-        Functions tries to download the task data 10 times if the archive is empty and
-        returns False if it can't download the data after 10 retries. Otherwise returns True.
-
-        :param task_id: task ID in CVAT
-        :type task_id: int
-        :param task_path: path for saving task data in zip archive
-        :type task_path: str
-        :param retry: current number of retries, defaults to 0
-        :type retry: int, optional
-        :return: download status (True if the archive is not empty, False otherwise)
-        :rtype: bool
-        """
-        sly.logger.debug("Trying to retreive task data from API...")
-        task_data = retreive_dataset(task_id=task.id)
-
-        with open(task_path, "wb") as f:
-            shutil.copyfileobj(task_data, f)
-
-        sly.logger.info(f"Saved data to path: {task_path}, will check it's size...")
-
-        # Check if the archive has non-zero size.
-        if os.path.getsize(task_path) == 0:
-            sly.logger.debug(f"The archive for task {task_id} is empty, removing it...")
-            sly.fs.silent_remove(task_path)
-            sly.logger.debug(f"The archive with path {task_path} was removed.")
+    def save_dataset_to_zip(
+        dataset: RemoteDatasetV2, retry: int = 0
+    ) -> Union[None, str]:
+        sly.logger.info("Trying to retreive dataset data from V7 API...")
+        archive_path = retreive_dataset(task_id=task.id)
+        if archive_path is None:
             sly.logger.info(
-                f"Will retry to download task {task_id}, because the archive is empty."
+                f"Can not retreive dataset data from V7 API for dataset {dataset.name}"
+            )
+            sly.logger.info(
+                f"Will retry to download dataset {dataset.name}, because the archive is empty."
             )
             if retry < 10:
                 # Try to download the task data again.
@@ -170,15 +152,17 @@ def start_copying() -> None:
                     sleep(1)
                     timer -= 1
 
-                sly.logger.info(f"Retry {retry} to download task {task_id}...")
-                save_task_to_zip(task_id, task_path, retry)
+                sly.logger.info(f"Retry {retry} to download dataset {dataset.name}...")
+                save_dataset_to_zip(dataset, retry)
             else:
                 # If the archive is empty after 10 retries, return False.
-                sly.logger.error(f"Can't download task {task_id} after 10 retries.")
-                return False
+                sly.logger.warning(
+                    f"Can't download dataset {dataset.name} after 10 retries."
+                )
+                return
         else:
-            sly.logger.debug(f"Archive for task {task_id} was downloaded correctly.")
-            return True
+            sly.logger.debug(f"Archive for dataset {dataset.name} was downloaded.")
+            return archive_path
 
     succesfully_uploaded = 0
     uploded_with_errors = 0
@@ -187,7 +171,10 @@ def start_copying() -> None:
         total=len(g.STATE.selected_projects), message="Copying..."
     ) as pbar:
         for project_id in g.STATE.selected_projects:
-            sly.logger.debug(f"Copying project with id: {project_id}")
+            project = g.STATE.projects[project_id]
+            sly.logger.debug(
+                f"Copying project with id: {project_id} and name: {project.name}"
+            )
             update_cells(project_id, new_status=g.COPYING_STATUS.working)
 
             task_ids_with_errors = []
@@ -267,7 +254,7 @@ def start_copying() -> None:
     sly.logger.info(f"Finished copying {len(g.STATE.selected_projects)} projects.")
 
     if sly.is_development():
-        # * For debug purposes it's better to save the data from CVAT.
+        # * For debug purposes it's better to save the data from V7.
         sly.logger.debug(
             "Development mode, will not stop the application. "
             "And NOT clean download and upload directories."
@@ -298,16 +285,16 @@ def convert_and_upload(
     3. For each task:
         3.1. Unpacks the task archive in a separate directory in project directory.
         3.2. Parses annotations.xml and reads list of images.
-        3.3. Converts CVAT annotations to Supervisely format.
+        3.3. Converts V7 annotations to Supervisely format.
         3.4. Depending on data type (images or video) creates specific annotations.
         3.5. Uploads images or video to Supervisely.
         3.6. Uploads annotations to Supervisely.
     4. Updates the project in the projects table with new URLs.
     5. Returns True if the upload was successful, False otherwise.
 
-    :param project_id: ID of the project in CVAT
+    :param project_id: ID of the project in V7
     :type project_id: id
-    :param project_name: name of the project in CVAT
+    :param project_name: name of the project in V7
     :type project_name: str
     :param task_archive_paths: list of tuples for each task, which containing path to the task archive and data type
         possible data types: 'imageset', 'video'

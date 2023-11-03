@@ -58,7 +58,7 @@ def connected() -> None:
     connection_status_text.text = "Successfully connected to V7."
 
     connection_status_text.show()
-    selection.fill_transfer_with_projects()
+    selection.fill_transfer_with_datasets()
 
 
 def disconnected(with_error=False) -> None:
