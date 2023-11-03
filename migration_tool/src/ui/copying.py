@@ -177,7 +177,11 @@ def start_copying() -> None:
 
             archive_path = save_dataset(dataset)
             if not archive_path:
-                pass
+                sly.logger.warning(f"Can not download dataset {dataset.name}.")
+                pbar.update(1)
+                continue
+
+            # TODO: Implement FOLDER converter V7 -> Supervisely.
 
             # task_ids_with_errors = []
             # task_archive_paths = []
