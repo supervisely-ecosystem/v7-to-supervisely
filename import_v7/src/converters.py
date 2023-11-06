@@ -172,6 +172,25 @@ def convert_polygon(v7_label: Dict[str, Any]) -> sly.Label:
     return sly_label
 
 
+def convert_point(v7_label: Dict[str, Any]) -> sly.Label:
+    # TODO: Video support + docstrings
+    class_name = v7_label.get("name")
+    keypoint = v7_label.get("keypoint")
+    sly.logger.debug(f"Converting keypoint: {keypoint} with class name: {class_name}")
+
+    obj_class = sly.ObjClass(name=class_name, geometry_type=sly.Point)
+    row, col = keypoint.get("y"), keypoint.get("x")
+
+    geometry = sly.Point(row=row, col=col)
+
+    sly_label = sly.Label(
+        geometry=geometry,
+        obj_class=obj_class,
+    )
+
+    return sly_label
+
+
 def convert_tag(v7_label: Dict[str, Any]) -> sly.Tag:
     class_name = v7_label.get("name")
     tag_meta = sly.TagMeta(name=class_name, value_type=sly.TagValueType.NONE)
@@ -369,4 +388,5 @@ CONVERT_MAP = {
     "line": convert_polyline,
     "polygon": convert_polygon,
     "tag": convert_tag,
+    "keypoint": convert_point,
 }
