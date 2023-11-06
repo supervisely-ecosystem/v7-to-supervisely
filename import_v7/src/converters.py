@@ -1,6 +1,7 @@
 import os
 from typing import List, Tuple, Dict, Any, Union, Literal
 import supervisely as sly
+from supervisely.geometry.graph import KeypointsTemplate
 
 
 def get_entities_paths(dataset_path: str) -> List[str]:
@@ -187,6 +188,35 @@ def convert_point(v7_label: Dict[str, Any]) -> sly.Label:
         geometry=geometry,
         obj_class=obj_class,
     )
+
+    return sly_label
+
+
+def convert_graph(v7_label: Dict[str, Any]) -> sly.Label:
+    # TODO: Video support + docstrings
+    class_name = v7_label.get("name")
+    skeleton = v7_label.get("skeleton")
+    nodes = skeleton.get("nodes")
+
+    MULTIPLIER = 10
+
+    template = KeypointsTemplate()
+    sly_nodes = []
+    for idx, node in enumerate(nodes):
+        label = node.get("name")
+        row, col = node.get("y"), node.get("x")
+        template.add_point(label=label, row=idx * MULTIPLIER, col=idx * MULTIPLIER)
+        sly_nodes.append(sly.Node(label=label, row=row, col=col))
+
+    obj_class = sly.ObjClass(
+        name=class_name,
+        geometry_type=sly.GraphNodes,
+        geometry_config=template,
+    )
+
+    geometry = sly.GraphNodes(sly_nodes)
+
+    sly_label = sly.Label(geometry=geometry, obj_class=obj_class)
 
     return sly_label
 
@@ -389,4 +419,5 @@ CONVERT_MAP = {
     "polygon": convert_polygon,
     "tag": convert_tag,
     "keypoint": convert_point,
+    "skeleton": convert_graph,
 }
