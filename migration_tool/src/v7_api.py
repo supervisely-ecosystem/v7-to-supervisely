@@ -65,6 +65,14 @@ def retreive_dataset(dataset: RemoteDatasetV2) -> bool:
         except NotFound:
             sly.logger.warning(f"Can't find any release for dataset {dataset.name}")
             return False
+        except ValueError as e:
+            sly.logger.warning(
+                f"Can not download the dataset {dataset.name} due to V7 API or SDK error. "
+                "This error comes from V7 and is not related to Supervisely. "
+                "Please, contact V7 support about it. "
+                f"Error: {e}"
+            )
+            return False
 
 
 def get_export_name():
