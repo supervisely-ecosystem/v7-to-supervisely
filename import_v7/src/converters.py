@@ -172,6 +172,12 @@ def convert_polygon(v7_label: Dict[str, Any]) -> sly.Label:
     return sly_label
 
 
+def convert_tag(v7_label: Dict[str, Any]) -> sly.Tag:
+    class_name = v7_label.get("name")
+    tag_meta = sly.TagMeta(name=class_name, value_type=sly.TagValueType.NONE)
+    return sly.Tag(tag_meta)
+
+
 def get_exterior(path: List[Dict[str, float]]) -> List[Tuple[float, float]]:
     exterior = []
     for point in path:
@@ -203,7 +209,7 @@ def v7_image_ann_to_sly(v7_ann: Dict[str, Any], image_path: str) -> sly.Annotati
     sly.logger.info(f"Found {len(v7_labels)} V7 labels in annotation.")
     sly.logger.debug(f"V7 Labels dict: {v7_labels}")
 
-    sly_labels = []
+    sly_labels, img_tags = [], []
     for v7_label in v7_labels:
         geometry_type = get_geometry_type(v7_label)
         convert_func = CONVERT_MAP.get(geometry_type)
@@ -212,9 +218,14 @@ def v7_image_ann_to_sly(v7_ann: Dict[str, Any], image_path: str) -> sly.Annotati
             continue
         sly_label = convert_func(v7_label)
         if sly_label is not None:
-            sly_labels.append(sly_label)
+            if geometry_type == "tag":
+                img_tags.append(sly_label)
+            else:
+                sly_labels.append(sly_label)
 
-    sly_ann = sly.Annotation(img_size=(image_height, image_width), labels=sly_labels)
+    sly_ann = sly.Annotation(
+        img_size=(image_height, image_width), labels=sly_labels, img_tags=img_tags
+    )
     return sly_ann
 
 
@@ -236,7 +247,8 @@ def get_geometry_type(
 
     if len(appeared_geometries) > 1 and "bounding_box" in appeared_geometries:
         appeared_geometries.remove("bounding_box")
-
+    elif len(appeared_geometries) == 0:
+        return
     return appeared_geometries[0]
 
 
@@ -314,6 +326,10 @@ def process_image_entities(
         sly.json.dump_json_file(v7_ann, ann_path)
         # ! End of debug code
         sly_ann = v7_image_ann_to_sly(v7_ann, image_path)
+        for img_tag in sly_ann.img_tags:
+            if img_tag.meta not in project_meta.tag_metas:
+                project_meta = project_meta.add_tag_meta(img_tag.meta)
+                sly.logger.info(f"Added image tag {img_tag.meta.name} to project meta")
         for label in sly_ann.labels:
             if label.obj_class not in project_meta.obj_classes:
                 project_meta = project_meta.add_obj_class(label.obj_class)
@@ -352,4 +368,5 @@ CONVERT_MAP = {
     "bounding_box": convert_bbox,
     "line": convert_polyline,
     "polygon": convert_polygon,
+    "tag": convert_tag,
 }

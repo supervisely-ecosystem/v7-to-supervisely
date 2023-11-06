@@ -48,7 +48,7 @@ def retreive_dataset(dataset: RemoteDatasetV2) -> bool:
             "before the export will be available for download."
         )
     except NameTaken:
-        sly.logger.info(f"Export {get_export_name()} already exists")
+        sly.logger.info(f"Export {export_name} already exists")
     finally:
         try:
             release = dataset.get_release()
