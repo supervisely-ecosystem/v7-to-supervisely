@@ -30,13 +30,9 @@ api: sly.Api = sly.Api.from_env()
 TEMP_DIR = os.path.join(PARENT_DIR, "temp")
 
 # * Directory, where downloaded V7 datasets will be stored.
-DOWNLOAD_DIR = os.path.join(TEMP_DIR, "downloads")
-
-# * Directory, where prepared V7 datasets will be stored.
-PREPARED_DIR = os.path.join(TEMP_DIR, "prepared")
+DOWNLOAD_DIR = os.path.join(TEMP_DIR, "download")
 sly.fs.mkdir(DOWNLOAD_DIR, remove_content_if_exists=True)
-sly.fs.mkdir(PREPARED_DIR, remove_content_if_exists=True)
-sly.logger.debug(f"Download dir: {DOWNLOAD_DIR}, prepared dir: {PREPARED_DIR}")
+sly.logger.debug(f"Download dir: {DOWNLOAD_DIR}")
 
 
 class State:

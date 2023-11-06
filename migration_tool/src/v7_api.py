@@ -38,7 +38,7 @@ def get_dataset_url(dataset_id: int) -> str:
     return f"{DEFAULT_DATASET_ADDRESS}/{dataset_id}/"
 
 
-def retreive_dataset(dataset: RemoteDatasetV2) -> Union[None, str]:
+def retreive_dataset(dataset: RemoteDatasetV2) -> bool:
     export_name = get_export_name()
     sly.logger.info(f"Will try to export dataset {dataset.name} to {export_name}")
     try:
@@ -60,11 +60,11 @@ def retreive_dataset(dataset: RemoteDatasetV2) -> Union[None, str]:
             sly.logger.info(f"Export path of dataset {dataset.name}: {export_path}")
             if not os.path.isdir(export_path):
                 sly.logger.error(f"Can't find downloaded dataset in {export_path}")
-                return
-            return export_path
+                return False
+            return True
         except NotFound:
             sly.logger.warning(f"Can't find any release for dataset {dataset.name}")
-            return
+            return False
 
 
 def get_export_name():

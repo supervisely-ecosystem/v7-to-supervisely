@@ -1,5 +1,5 @@
 import os
-from typing import List, Tuple, Dict, Any, Union
+from typing import List, Tuple, Dict, Any, Union, Literal
 import supervisely as sly
 
 
@@ -105,6 +105,7 @@ def split_entities(
 
 
 def convert_bbox(v7_label: Dict[str, Any]) -> sly.Label:
+    # TODO: Video support + docstrings
     class_name = v7_label.get("name")
     bbox = v7_label.get("bounding_box")
     sly.logger.debug(f"Converting bbox: {bbox} with class name: {class_name}")
@@ -129,6 +130,53 @@ def convert_bbox(v7_label: Dict[str, Any]) -> sly.Label:
     sly_label = sly.Label(obj_class=obj_class, geometry=geometry)
 
     return sly_label
+
+
+def convert_polyline(v7_label: Dict[str, Any]) -> sly.Label:
+    # TODO: Video support + docstrings
+    class_name = v7_label.get("name")
+    line = v7_label.get("line")
+    sly.logger.debug(f"Converting polyline: {line} with class name: {class_name}")
+
+    obj_class = sly.ObjClass(name=class_name, geometry_type=sly.Polyline)
+
+    exterior = get_exterior(line.get("path"))
+
+    geometry = sly.Polyline(exterior=exterior)
+
+    sly_label = sly.Label(
+        geometry=geometry,
+        obj_class=obj_class,
+    )
+
+    return sly_label
+
+
+def convert_polygon(v7_label: Dict[str, Any]) -> sly.Label:
+    # TODO: Video support + docstrings
+    class_name = v7_label.get("name")
+    polygon = v7_label.get("polygon")
+    sly.logger.debug(f"Converting polygon: {polygon} with class name: {class_name}")
+
+    obj_class = sly.ObjClass(name=class_name, geometry_type=sly.Polygon)
+
+    exterior = get_exterior(polygon.get("paths")[0])
+
+    geometry = sly.Polygon(exterior=exterior)
+
+    sly_label = sly.Label(
+        geometry=geometry,
+        obj_class=obj_class,
+    )
+
+    return sly_label
+
+
+def get_exterior(path: List[Dict[str, float]]) -> List[Tuple[float, float]]:
+    exterior = []
+    for point in path:
+        exterior.append((point.get("y"), point.get("x")))
+    return exterior
 
 
 def v7_image_ann_to_sly(v7_ann: Dict[str, Any], image_path: str) -> sly.Annotation:
@@ -157,10 +205,10 @@ def v7_image_ann_to_sly(v7_ann: Dict[str, Any], image_path: str) -> sly.Annotati
 
     sly_labels = []
     for v7_label in v7_labels:
-        geometry_type = list(v7_label.keys())[0]
+        geometry_type = get_geometry_type(v7_label)
         convert_func = CONVERT_MAP.get(geometry_type)
         if convert_func is None:
-            sly.logger.warning(f"Unknown geometry type {geometry_type}")
+            sly.logger.warning(f"Can't find any know geometry type in {v7_label}")
             continue
         sly_label = convert_func(v7_label)
         if sly_label is not None:
@@ -168,6 +216,28 @@ def v7_image_ann_to_sly(v7_ann: Dict[str, Any], image_path: str) -> sly.Annotati
 
     sly_ann = sly.Annotation(img_size=(image_height, image_width), labels=sly_labels)
     return sly_ann
+
+
+def get_geometry_type(
+    v7_label: Dict[str, Any]
+) -> Literal["bounding_box", "line", "polygon"]:
+    """Returns string with geometry type of V7 label.
+    V7 dict labels are unordered, so we need to find geometry type key.
+
+    :param v7_label: V7 label in JSON format
+    :type v7_label: Dict[str, Any]
+    :return: string with geometry type of V7 label
+    :rtype: str
+    """
+    appeared_geometries = []
+    for key in v7_label.keys():
+        if key in CONVERT_MAP.keys():
+            appeared_geometries.append(key)
+
+    if len(appeared_geometries) > 1 and "bounding_box" in appeared_geometries:
+        appeared_geometries.remove("bounding_box")
+
+    return appeared_geometries[0]
 
 
 def process_v7_dataset(
@@ -240,6 +310,9 @@ def process_image_entities(
     image_paths = []
     for image_path, ann_path in image_entities:
         v7_ann = sly.json.load_json_file(ann_path)
+        # ! Debug code, remove it later
+        sly.json.dump_json_file(v7_ann, ann_path)
+        # ! End of debug code
         sly_ann = v7_image_ann_to_sly(v7_ann, image_path)
         for label in sly_ann.labels:
             if label.obj_class not in project_meta.obj_classes:
@@ -277,4 +350,6 @@ def process_video_entities():
 
 CONVERT_MAP = {
     "bounding_box": convert_bbox,
+    "line": convert_polyline,
+    "polygon": convert_polygon,
 }

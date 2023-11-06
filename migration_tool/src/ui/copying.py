@@ -11,7 +11,12 @@ from supervisely.app.widgets import (
     Text,
     Flexbox,
 )
-from migration_tool.src.v7_api import get_datasets, get_dataset_url, retreive_dataset
+from migration_tool.src.v7_api import (
+    get_datasets,
+    get_dataset_url,
+    retreive_dataset,
+    get_export_path,
+)
 from import_v7.src.converters import process_v7_dataset
 import migration_tool.src.globals as g
 
@@ -122,13 +127,12 @@ def start_copying() -> None:
 
     def save_dataset(dataset: RemoteDatasetV2, retry: int = 0) -> Union[None, str]:
         sly.logger.info("Trying to retreive dataset data from V7 API...")
-        archive_path = retreive_dataset(dataset)
-        if archive_path is None:
+        export_path = get_export_path(dataset)
+        sly.logger.info(f"Export path for dataset {dataset.name}: {export_path}")
+        download_status = retreive_dataset(dataset)
+        if not download_status:
             sly.logger.info(
-                f"Can not retreive dataset data from V7 API for dataset {dataset.name}"
-            )
-            sly.logger.info(
-                f"Will retry to download dataset {dataset.name}, because the archive is empty."
+                f"Can not download dataset data from V7 API for dataset {dataset.name}"
             )
             if retry < 10:
                 # Try to download the task data again.
@@ -148,8 +152,8 @@ def start_copying() -> None:
                 )
                 return
         else:
-            sly.logger.debug(f"Archive for dataset {dataset.name} was downloaded.")
-            return archive_path
+            sly.logger.debug(f"Dataset {dataset.name} was downloaded.")
+            return export_path
 
     succesfully_uploaded = 0
     uploded_with_errors = 0
@@ -169,7 +173,7 @@ def start_copying() -> None:
             update_cells(dataset_id, new_status=g.COPYING_STATUS.working)
 
             dataset_path = save_dataset(dataset)
-            if not dataset_path:
+            if dataset_path is None:
                 sly.logger.warning(f"Can not download dataset {dataset.name}.")
                 pbar.update(1)
                 continue
@@ -221,11 +225,9 @@ def start_copying() -> None:
         return
 
     sly.fs.clean_dir(g.DOWNLOAD_DIR)
-    sly.fs.clean_dir(g.PREPARED_DIR)
 
     sly.logger.info(
-        f"Removed content from {g.DOWNLOAD_DIR} and {g.PREPARED_DIR}."
-        "Will stop the application."
+        f"Removed content from {g.DOWNLOAD_DIR}, will stop the application."
     )
 
     from migration_tool.src.main import app
