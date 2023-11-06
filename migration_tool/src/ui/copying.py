@@ -1,7 +1,5 @@
-import os
-import shutil
 import supervisely as sly
-from typing import List, Tuple, Union
+from typing import Union
 from time import sleep
 from darwin.dataset.remote_dataset_v2 import RemoteDatasetV2
 from supervisely.app.widgets import (
@@ -13,17 +11,8 @@ from supervisely.app.widgets import (
     Text,
     Flexbox,
 )
-import xml.etree.ElementTree as ET
 from migration_tool.src.v7_api import get_datasets, get_dataset_url, retreive_dataset
-
-# from import_cvat.src.converters import (
-#     convert_images_annotations,
-#     convert_video_annotations,
-#     prepare_images_for_upload,
-#     upload_images_task,
-#     update_project_meta,
-#     images_to_mp4,
-# )
+from import_v7.src.converters import process_v7_dataset
 import migration_tool.src.globals as g
 
 
@@ -169,83 +158,47 @@ def start_copying() -> None:
         total=len(g.STATE.selected_datasets), message="Copying..."
     ) as pbar:
         for dataset_id in g.STATE.selected_datasets:
+            if not g.STATE.continue_copying:
+                sly.logger.debug("Copying is stopped by the user.")
+                break
+
             dataset = g.STATE.datasets[dataset_id]
             sly.logger.debug(
                 f"Copying project with id: {dataset_id} and name: {dataset.name}"
             )
             update_cells(dataset_id, new_status=g.COPYING_STATUS.working)
 
-            archive_path = save_dataset(dataset)
-            if not archive_path:
+            dataset_path = save_dataset(dataset)
+            if not dataset_path:
                 sly.logger.warning(f"Can not download dataset {dataset.name}.")
                 pbar.update(1)
                 continue
 
-            # TODO: Implement FOLDER converter V7 -> Supervisely.
+            image_project_info, video_project_info = process_v7_dataset(
+                dataset_path, g.api, g.STATE.selected_workspace
+            )
 
-            # task_ids_with_errors = []
-            # task_archive_paths = []
+            if image_project_info is not None or video_project_info is not None:
+                new_status = g.COPYING_STATUS.copied
+                succesfully_uploaded += 1
+                update_cells(dataset_id, new_status=new_status)
 
-            # for task in cvat_data(project_id=project_id):
-            #     data_type = task.data_type
+            if image_project_info is not None:
+                try:
+                    new_url = sly.utils.abs_url(image_project_info.url)
+                except Exception:
+                    new_url = image_project_info.url
+                sly.logger.debug(f"New URL for images project: {new_url}")
+                update_cells(dataset_id, new_url=new_url)
+            if video_project_info is not None:
+                try:
+                    new_url = sly.utils.abs_url(video_project_info.url)
+                except Exception:
+                    new_url = video_project_info.url
+                sly.logger.debug(f"New URL for videos project: {new_url}")
+                update_cells(dataset_id, new_url=new_url)
 
-            #     sly.logger.debug(
-            #         f"Copying task with id: {task.id}, data type: {data_type}"
-            #     )
-            #     if not g.STATE.continue_copying:
-            #         sly.logger.debug("Copying is stopped by the user.")
-            #         continue
-
-            #     project_name = g.STATE.project_names[project_id]
-            #     project_dir = os.path.join(
-            #         g.ARCHIVE_DIR, f"{project_id}_{project_name}_{data_type}"
-            #     )
-            #     sly.fs.mkdir(project_dir)
-            #     task_filename = f"{task.id}_{task.name}_{data_type}.zip"
-
-            #     task_path = os.path.join(project_dir, task_filename)
-            #     download_status = save_task_to_zip(task.id, task_path)
-            #     if download_status is False:
-            #         task_ids_with_errors.append(task.id)
-            #     else:
-            #         task_archive_paths.append((task_path, data_type))
-
-            # if not task_archive_paths:
-            #     sly.logger.warning(
-            #         f"No tasks was successfully downloaded for project ID {project_id}. It will be skipped."
-            #     )
-            #     new_status = g.COPYING_STATUS.error
-            #     uploded_with_errors += 1
-            # else:
-            #     upload_status = convert_and_upload(
-            #         project_id, project_name, task_archive_paths
-            #     )
-
-            #     if task_ids_with_errors:
-            #         sly.logger.warning(
-            #             f"Project ID {project_id} was downloaded with errors. "
-            #             "Task IDs with errors: {task_ids_with_errors}."
-            #         )
-            #         new_status = g.COPYING_STATUS.error
-            #         uploded_with_errors += 1
-            #     elif not upload_status:
-            #         sly.logger.warning(
-            #             f"Project ID {project_id} was uploaded with errors."
-            #         )
-            #         new_status = g.COPYING_STATUS.error
-            #         uploded_with_errors += 1
-            #     else:
-            #         sly.logger.info(
-            #             f"Project ID {project_id} was downloaded successfully."
-            #         )
-            #         new_status = g.COPYING_STATUS.copied
-            #         succesfully_uploaded += 1
-
-            # update_cells(project_id, new_status=new_status)
-
-            # sly.logger.info(f"Finished processing project ID {project_id}.")
-
-            # pbar.update(1)
+            pbar.update(1)
 
     if succesfully_uploaded:
         good_results.text = f"Succesfully uploaded {succesfully_uploaded} projects."
@@ -278,269 +231,6 @@ def start_copying() -> None:
     from migration_tool.src.main import app
 
     app.stop()
-
-
-def convert_and_upload(
-    project_id: id, project_name: str, task_archive_paths: List[Tuple[str, str]]
-) -> bool:
-    """Unpacks the task archive, parses it's content, converts it to Supervisely format
-    and uploads it to Supervisely.
-
-    1. Checks if the task archive contains images or video.
-    2. Creates projects with corresponding data types in Supervisely (images or videos).
-    3. For each task:
-        3.1. Unpacks the task archive in a separate directory in project directory.
-        3.2. Parses annotations.xml and reads list of images.
-        3.3. Converts V7 annotations to Supervisely format.
-        3.4. Depending on data type (images or video) creates specific annotations.
-        3.5. Uploads images or video to Supervisely.
-        3.6. Uploads annotations to Supervisely.
-    4. Updates the project in the projects table with new URLs.
-    5. Returns True if the upload was successful, False otherwise.
-
-    :param project_id: ID of the project in V7
-    :type project_id: id
-    :param project_name: name of the project in V7
-    :type project_name: str
-    :param task_archive_paths: list of tuples for each task, which containing path to the task archive and data type
-        possible data types: 'imageset', 'video'
-    :type task_archive_paths: List[Tuple[str, str]]
-    :return: status of the upload (True if the upload was successful, False otherwise)
-    :rtype: bool
-    """
-    unpacked_project_path = os.path.join(g.UNPACKED_DIR, f"{project_id}_{project_name}")
-    sly.logger.debug(f"Unpacked project path: {unpacked_project_path}")
-
-    images_project = None
-    videos_project = None
-
-    if any(task_data_type == "imageset" for _, task_data_type in task_archive_paths):
-        images_project = g.api.project.create(
-            g.STATE.selected_workspace,
-            f"From CVAT {project_name} (images)",
-            change_name_if_conflict=True,
-        )
-        sly.logger.debug(f"Created project {images_project.name} in Supervisely.")
-
-        images_project_meta = sly.ProjectMeta.from_json(
-            g.api.project.get_meta(images_project.id)
-        )
-
-        sly.logger.debug(f"Retrieved images project meta for {images_project.name}.")
-
-    if any(task_data_type == "video" for _, task_data_type in task_archive_paths):
-        videos_project = g.api.project.create(
-            g.STATE.selected_workspace,
-            f"From CVAT {project_name} (videos)",
-            type=sly.ProjectType.VIDEOS,
-            change_name_if_conflict=True,
-        )
-        sly.logger.debug(f"Created project {videos_project.name} in Supervisely.")
-
-        videos_project_meta = sly.ProjectMeta.from_json(
-            g.api.project.get_meta(videos_project.id)
-        )
-
-        sly.logger.debug(f"Retrieved videos project meta for {videos_project.name}.")
-
-    succesfully_uploaded = True
-
-    for task_archive_path, task_data_type in task_archive_paths:
-        sly.logger.debug(
-            f"Processing task archive {task_archive_path} with data type {task_data_type}."
-        )
-        # * Unpacking archive, parsing annotations.xml and reading list of images.
-        images_et, images_paths, source = unpack_and_read_task(
-            task_archive_path, unpacked_project_path
-        )
-
-        sly.logger.debug(f"Parsed annotations and found {len(images_et)} images.")
-
-        # * Using archive name as dataset name.
-        dataset_name = sly.fs.get_file_name(task_archive_path)
-        sly.logger.debug(f"Will use {dataset_name} as dataset name.")
-
-        if task_data_type == "imageset":
-            # Working with Supervisely Images Project.
-            sly.logger.debug(
-                "Data type is imageset, will convert annotations to Supervisely format."
-            )
-
-            task_tags, image_objects = convert_images_annotations(
-                images_et, images_paths
-            )
-
-            # * Prepare lists of paths, names and build annotations from labels.
-            images_names, images_paths, images_anns = prepare_images_for_upload(
-                g.api, image_objects, images_project, images_project_meta
-            )
-
-            sly.logger.debug(f"Task data type is {task_data_type}, will upload images.")
-
-            upload_images_task(
-                g.api,
-                dataset_name,
-                images_project,
-                images_names,
-                images_paths,
-                images_anns,
-                task_tags,
-            )
-
-            sly.logger.info(
-                f"Finished processing task archive {task_archive_path} with data type {task_data_type}."
-            )
-        elif task_data_type == "video":
-            # Working with Supervisely Videos Project.
-            sly.logger.debug(
-                "Task data type is video, will convert annotations to Supervisely format."
-            )
-
-            (
-                video_size,
-                video_frames,
-                video_objects,
-                video_tags,
-            ) = convert_video_annotations(images_et, images_paths)
-
-            sly.logger.debug(f"Found {len(video_frames)} frames in the video.")
-
-            update_project_meta(
-                g.api,
-                videos_project_meta,
-                videos_project.id,
-                labels=video_objects,
-                tags=video_tags,
-            )
-
-            # Prepare the name for output video using source name from CVAT annotation.
-            # Prepare the path for output video using project directory and source name.
-            # Save the video to the path.
-            source_name = f"{sly.fs.get_file_name(source)}.mp4"
-            video_path = os.path.join(unpacked_project_path, source_name)
-            sly.logger.debug(f"Will save video to {video_path}.")
-            images_to_mp4(video_path, images_paths, video_size)
-
-            # Create Supervisely VideoAnnotation object using data from CVAT annotation.
-            frames = sly.FrameCollection(video_frames)
-            objects = sly.VideoObjectCollection(video_objects)
-            tag_collection = sly.VideoTagCollection(video_tags)
-
-            sly.logger.debug(
-                f"Will create VideoAnnotation object with: {video_size} size, "
-                f"{len(frames)} frames, {len(objects)} objects, {len(tag_collection)} tags."
-            )
-
-            ann = sly.VideoAnnotation(
-                video_size, len(frames), objects, frames, tag_collection
-            )
-
-            sly.logger.debug("VideoAnnotation successfully created.")
-
-            dataset_info = g.api.dataset.create(
-                videos_project.id, dataset_name, change_name_if_conflict=True
-            )
-
-            sly.logger.debug(
-                f"Created dataset {dataset_info.name} in project {videos_project.name}."
-                "Uploading video..."
-            )
-
-            uploaded_video: sly.api.video_api.VideoInfo = g.api.video.upload_path(
-                dataset_info.id, source_name, video_path
-            )
-
-            sly.logger.debug(
-                f"Uploaded video {source_name} to dataset {dataset_info.name}."
-            )
-
-            g.api.video.annotation.append(uploaded_video.id, ann)
-
-            sly.logger.debug(f"Added annotation to video with ID {uploaded_video.id}.")
-
-            sly.logger.info(
-                f"Finished processing task archive {task_archive_path} with data type {task_data_type}."
-            )
-
-    sly.logger.info(
-        f"Finished copying project {project_name} from CVAT to Supervisely."
-    )
-
-    if images_project:
-        try:
-            new_url = sly.utils.abs_url(images_project.url)
-        except Exception:
-            new_url = images_project.url
-        sly.logger.debug(f"New URL for images project: {new_url}")
-        update_cells(project_id, new_url=new_url)
-    if videos_project:
-        try:
-            new_url = sly.utils.abs_url(videos_project.url)
-        except Exception:
-            new_url = videos_project.url
-        sly.logger.debug(f"New URL for videos project: {new_url}")
-        update_cells(project_id, new_url=new_url)
-
-    sly.logger.debug(f"Updated project {project_name} in the projects table.")
-
-    return succesfully_uploaded
-
-
-def unpack_and_read_task(
-    task_archive_path: str, unpacked_project_path: str
-) -> Tuple[List[ET.Element], List[str], str]:
-    """Unpacks the task archive from CVAT and reads it's content.
-    Parses annotations.xml and reads list of images in it.
-    Reads contents of the images directory and prepares a list of paths to the images.
-    Reads the "source" parameter in annotations.xml, it's needed to retrieve the
-    original name of the video file in CVAT.
-
-    :param task_archive_path: path to the task archive on the local machine
-    :type task_archive_path: str
-    :param unpacked_project_path: path to the directory where the task archive will be unpacked
-    :type unpacked_project_path: str
-    :return: list of images in annotations.xml, list of paths to the images, value of the "source" parameter
-    :rtype: Tuple[List[ET.Element], List[str], str]
-    """
-    unpacked_task_dir = sly.fs.get_file_name(task_archive_path)
-    unpacked_task_path = os.path.join(unpacked_project_path, unpacked_task_dir)
-
-    sly.fs.unpack_archive(task_archive_path, unpacked_task_path, remove_junk=True)
-    sly.logger.debug(f"Unpacked from {task_archive_path} to {unpacked_task_path}")
-
-    images_dir = os.path.join(unpacked_task_path, "images")
-    images_list = sly.fs.list_files(images_dir)
-
-    sly.logger.debug(f"Found {len(images_list)} images in {images_dir}.")
-
-    if not images_list:
-        sly.logger.warning(f"No images found in {images_dir}, task will be skipped.")
-        return
-
-    annotations_xml_path = os.path.join(unpacked_task_path, "annotations.xml")
-    if not os.path.exists(annotations_xml_path):
-        sly.logger.warning(
-            f"Can't find annotations.xml file in {unpacked_task_path}, will upload images without labels."
-        )
-
-    tree = ET.parse(annotations_xml_path)
-    sly.logger.debug(f"Parsed annotations.xml from {annotations_xml_path}.")
-
-    # * Getting source parameter, which nested in "meta" -> "task" -> "source".
-    try:
-        source = tree.find("meta").find("task").find("source").text
-    except Exception:
-        sly.logger.debug(f"Source parameter was not found in {annotations_xml_path}.")
-        source = None
-
-    images_et = tree.findall("image")
-    sly.logger.debug(f"Found {len(images_et)} images in annotations.xml.")
-
-    images_paths = [
-        os.path.join(images_dir, image_et.attrib["name"]) for image_et in images_et
-    ]
-
-    return images_et, images_paths, source
 
 
 def update_cells(project_id: int, **kwargs) -> None:

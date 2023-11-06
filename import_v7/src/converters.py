@@ -259,8 +259,9 @@ def process_image_entities(
     sly.logger.info(
         f"Uploaded {len(image_infos)} images to project {project_info.name}"
     )
+    image_ids = [image_info.id for image_info in image_infos]
 
-    api.annotation.upload_anns(image_infos, sly_anns)
+    api.annotation.upload_anns(image_ids, sly_anns)
     sly.logger.info(
         f"Uploaded {len(sly_anns)} annotations to project {project_info.name}"
     )
