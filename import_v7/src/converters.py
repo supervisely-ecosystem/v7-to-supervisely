@@ -470,18 +470,20 @@ def v7_video_ann_to_sly(v7_ann: Dict[str, Any], video_path: str) -> sly.Annotati
 
             if isinstance(sly_figure, list):
                 frame = sly.Frame(frame_idx, figures=sly_figure)
-                video_objects = [sly_figure.video_object for sly_figure in sly_figure]
+                label_objects = [sly_figure.video_object for sly_figure in sly_figure]
             else:
                 frame = sly.Frame(frame_idx, figures=[sly_figure])
-                video_objects = [sly_figure.video_object]
+                label_objects = [sly_figure.video_object]
 
             sly_frames.append(frame)
-            for video_object in video_objects:
-                if video_object not in video_objects:
-                    video_objects.append(video_object)
+            for label_object in label_objects:
+                if label_object not in video_objects:
+                    video_objects.append(label_object)
 
     objects = sly.VideoObjectCollection(video_objects)
+    sly.logger.debug(f"Number of video objects: {len(video_objects)}")
     frames = sly.FrameCollection(sly_frames)
+    sly.logger.debug(f"Number of frames: {len(sly_frames)}")
 
     sly_ann = sly.VideoAnnotation(
         img_size=(video_height, video_width),
