@@ -3,6 +3,7 @@ from typing import List, Tuple, Dict, Any, Union, Literal
 import supervisely as sly
 from supervisely.geometry.graph import KeypointsTemplate
 import numpy as np
+from collections import defaultdict
 
 
 def get_entities_paths(dataset_path: str) -> List[str]:
@@ -222,30 +223,39 @@ def convert_graph(v7_label: Dict[str, Any]) -> sly.Label:
     return sly_label
 
 
-def convert_bitmap(v7_label: Dict[str, Any], **kwargs) -> sly.Label:
+def convert_bitmap(v7_label: Dict[str, Any], **kwargs) -> List[sly.Label]:
     # TODO: Video support + docstrings
+    default_name = v7_label.get("name")
     height, width = kwargs.get("height"), kwargs.get("width")
     sly.logger.debug(f"Height: {height}, width: {width} for bitmap conversion")
-
-    class_name = v7_label.get("name")
-    obj_class = sly.ObjClass(name=class_name, geometry_type=sly.Bitmap)
     raster_layer = v7_label.get("raster_layer")
+
+    mask_annotation_ids_mapping = raster_layer.get("mask_annotation_ids_mapping")
+    inverted_mask_annotation_ids_mapping = {
+        value: key for key, value in mask_annotation_ids_mapping.items()
+    }
+    bitmap_names = kwargs.get("bitmap_names")
+
     dense_rle = raster_layer.get("dense_rle")
-    sly.logger.debug(f"Converting bitmap: {dense_rle} with class name: {class_name}")
-
-    binary_mask = dense_rle_to_binary_mask(dense_rle, height, width)
-
-    geometry = sly.Bitmap(data=binary_mask)
-
-    sly_label = sly.Label(
-        geometry=geometry,
-        obj_class=obj_class,
+    binary_masks: Dict[int, np.ndarray] = dense_rle_to_binary_mask(
+        dense_rle, height, width
     )
 
-    return sly_label
+    sly_labels = []
+    for bitmap_value, binary_mask in binary_masks.items():
+        bitmap_id = inverted_mask_annotation_ids_mapping.get(bitmap_value)
+        class_name = bitmap_names.get(bitmap_id, default_name)
+        obj_class = sly.ObjClass(name=class_name, geometry_type=sly.Bitmap)
+        geometry = sly.Bitmap(data=binary_mask)
+        sly_label = sly.Label(geometry=geometry, obj_class=obj_class)
+        sly_labels.append(sly_label)
+
+    return sly_labels
 
 
-def dense_rle_to_binary_mask(rle: List[int], height: int, width: int) -> np.ndarray:
+def dense_rle_to_binary_mask(
+    rle: List[int], height: int, width: int
+) -> Dict[int, np.ndarray]:
     """Converts dense RLE to binary mask.
     Dense RLE contains pairs of values: value and count of this value.
     RLE example: [0, 91830, 1, 1, 0, 181449]
@@ -253,21 +263,42 @@ def dense_rle_to_binary_mask(rle: List[int], height: int, width: int) -> np.ndar
         then 1 pixel is 1
         then pixels from 0 to 181449 are 0
 
+    The data in RLE also can be coded for different layers.
+    For example, 1 - coded for class "car", 2 - coded for class "person".
+    For this case, we need to decode RLE for each layer separately
+    and return dict with binary masks for each layer.
+
     :param rle: mask in dense RLE format
     :type rle: List[int]
     :param height: height of mask (image)
     :type height: int
     :param width: width of mask (image)
     :type width: int
-    :return: binary mask, contains 0 and 1 values
-    :rtype: np.ndarray
+    :return: dict with binary masks for each layer, where key is layer value
+        and value is binary mask
+    :rtype: Dict[int, np.ndarray]
     """
-    decoded_rle = []
+    values = set(rle[::2])
+    decoded_rle = {}
+    for value in values:
+        if value == 0:
+            continue
+        decoded_rle[value] = []
+
     for rle_pair in zip(rle[::2], rle[1::2]):
         value, count = rle_pair
-        decoded_rle.extend([value] * count)
-    binary_mask = np.array(decoded_rle).reshape((height, width))
-    return binary_mask
+        for key in decoded_rle.keys():
+            if key == value:
+                decoded_rle[key].extend([1] * count)
+            else:
+                decoded_rle[key].extend([0] * count)
+
+    binary_masks = {}
+    for key, value in decoded_rle.items():
+        binary_mask = np.array(value).reshape((height, width))
+        binary_masks[key] = binary_mask
+
+    return binary_masks
 
 
 def convert_tag(v7_label: Dict[str, Any]) -> sly.Tag:
@@ -307,6 +338,8 @@ def v7_image_ann_to_sly(v7_ann: Dict[str, Any], image_path: str) -> sly.Annotati
     sly.logger.info(f"Found {len(v7_labels)} V7 labels in annotation.")
     sly.logger.debug(f"V7 Labels dict: {v7_labels}")
 
+    bitmap_names = get_bitmap_names(v7_labels)
+
     sly_labels, img_tags = [], []
     for v7_label in v7_labels:
         geometry_type = get_geometry_type(v7_label)
@@ -314,9 +347,13 @@ def v7_image_ann_to_sly(v7_ann: Dict[str, Any], image_path: str) -> sly.Annotati
         if convert_func is None:
             sly.logger.warning(f"Can't find any know geometry type in {v7_label}")
             continue
-        sly_label = convert_func(v7_label, height=image_height, width=image_width)
+        sly_label = convert_func(
+            v7_label, height=image_height, width=image_width, bitmap_names=bitmap_names
+        )
         if sly_label is not None:
-            if geometry_type == "tag":
+            if isinstance(sly_label, list):
+                sly_labels.extend(sly_label)
+            elif geometry_type == "tag":
                 img_tags.append(sly_label)
             else:
                 sly_labels.append(sly_label)
@@ -325,6 +362,16 @@ def v7_image_ann_to_sly(v7_ann: Dict[str, Any], image_path: str) -> sly.Annotati
         img_size=(image_height, image_width), labels=sly_labels, img_tags=img_tags
     )
     return sly_ann
+
+
+def get_bitmap_names(v7_labels: List[Dict[str, Any]]) -> Dict[str, str]:
+    bitmap_names = {}
+    for v7_label in v7_labels:
+        if "mask" in v7_label.keys():
+            bitmap_id = v7_label.get("id")
+            bitmap_name = v7_label.get("name")
+            bitmap_names[bitmap_id] = bitmap_name
+    return bitmap_names
 
 
 def get_geometry_type(
