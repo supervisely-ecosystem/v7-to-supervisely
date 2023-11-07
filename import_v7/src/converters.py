@@ -405,7 +405,7 @@ def v7_video_ann_to_sly(v7_ann: Dict[str, Any], video_path: str) -> sly.Annotati
     for v7_frame in v7_frames:
         frame_idx = list(v7_frame.get("frames").keys())[0]
         frame_label = v7_frame.get("frames").get(frame_idx)
-        frame_label["frame_idx"] = frame_idx
+        frame_label["frame_idx"] = int(frame_idx)
         frame_label["id"] = v7_frame.get("id")
         frame_label["name"] = v7_frame.get("name")
         v7_labels.append(frame_label)
@@ -531,7 +531,7 @@ def process_image_entities(
     api: sly.Api,
     workspace_id: int,
     project_name: str,
-):
+) -> sly.ProjectInfo:
     sly.logger.info(
         f"Starting processing project {project_name} with {len(image_entities)} images"
     )
@@ -598,7 +598,7 @@ def process_image_entities(
 
 def process_video_entities(
     video_entities: List[Tuple[str, str]], api, workspace_id, project_name
-):
+) -> sly.ProjectInfo:
     sly.logger.info(
         f"Starting processing project {project_name} with {len(video_entities)} videos"
     )
@@ -648,6 +648,13 @@ def process_video_entities(
     video_infos = api.video.upload_paths(dataset_info.id, video_names, video_paths)
     for video_info, sly_ann in zip(video_infos, sly_anns):
         api.video.annotation.append(video_info.id, sly_ann)
+
+    sly.logger.info(
+        f"Uploaded {len(video_infos)} videos to project {project_info.name}"
+    )
+    sly.logger.info(f"Finished processing project {project_info.name}")
+
+    return project_info
 
 
 CONVERT_MAP = {
