@@ -32,10 +32,10 @@ sly.logger.debug(f"App starting... SLY_APP_DATA_DIR: {SLY_APP_DATA_DIR}")
 
 TEMP_DIR = os.path.join(SLY_APP_DATA_DIR, "temp")
 
-# * Directory, where downloaded as archives CVAT tasks will be stored.
+# * Directory, where downloaded as archives V7 datasets will be stored.
 ARCHIVE_DIR = os.path.join(TEMP_DIR, "archives")
 
-# * Directory, where unpacked CVAT tasks will be stored.
+# * Directory, where unpacked V7 datasets will be stored.
 UNPACKED_DIR = os.path.join(TEMP_DIR, "unpacked")
 sly.fs.mkdir(ARCHIVE_DIR, remove_content_if_exists=True)
 sly.fs.mkdir(UNPACKED_DIR, remove_content_if_exists=True)
