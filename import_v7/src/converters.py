@@ -3,7 +3,7 @@ from typing import List, Tuple, Dict, Any, Union, Literal
 import supervisely as sly
 from supervisely.geometry.graph import KeypointsTemplate
 import numpy as np
-from collections import defaultdict
+import cv2
 
 
 def get_entities_paths(dataset_path: str) -> List[str]:
@@ -107,7 +107,9 @@ def split_entities(
     return image_entities, video_entities
 
 
-def convert_bbox(v7_label: Dict[str, Any]) -> sly.Label:
+def convert_bbox(
+    v7_label: Dict[str, Any], **kwargs
+) -> Union[sly.Label, sly.VideoFigure]:
     # TODO: Video support + docstrings
     class_name = v7_label.get("name")
     bbox = v7_label.get("bounding_box")
@@ -130,7 +132,12 @@ def convert_bbox(v7_label: Dict[str, Any]) -> sly.Label:
 
     geometry = sly.Rectangle(top=top, left=left, bottom=bottom, right=right)
 
-    sly_label = sly.Label(obj_class=obj_class, geometry=geometry)
+    frame_idx = kwargs.get("frame_idx")
+    if frame_idx is not None:
+        video_object = sly.VideoObject(obj_class)
+        sly_label = sly.VideoFigure(video_object, geometry, frame_idx)
+    else:
+        sly_label = sly.Label(obj_class=obj_class, geometry=geometry)
 
     return sly_label
 
@@ -364,6 +371,90 @@ def v7_image_ann_to_sly(v7_ann: Dict[str, Any], image_path: str) -> sly.Annotati
     return sly_ann
 
 
+def v7_video_ann_to_sly(v7_ann: Dict[str, Any], video_path: str) -> sly.Annotation:
+    """Converts V7 annotation to Supervisely annotation for video.
+
+    :param v7_ann: V7 annotation in JSON format
+    :type v7_ann: Dict[str, Any]
+    :param image_path: path to entity (image) to read its size if it is not in JSON
+    :type image_path: str
+    :return: Supervisely annotation object
+    :rtype: sly.Annotation
+    """
+    try:
+        slot = v7_ann.get("item").get("slots")[0]
+        video_height, video_width = slot.get("height"), slot.get("width")
+        frames_count = slot.get("frame_count")
+    except Exception as e:
+        sly.logger.info(
+            f"Can not get image size from annotation: {e}, will read it from entity."
+        )
+
+        cap = cv2.VideoCapture(video_path)
+        video_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        video_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        frames_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        cap.release()
+    sly.logger.info(f"Video size (HxW): {video_height}x{video_width}")
+
+    v7_frames = v7_ann.get("annotations", [])
+    sly.logger.info(f"Found {len(v7_frames)} V7 labels in annotation.")
+    sly.logger.debug(f"V7 Labels dict: {v7_frames}")
+
+    v7_labels = []
+    for v7_frame in v7_frames:
+        frame_idx = list(v7_frame.get("frames").keys())[0]
+        frame_label = v7_frame.get("frames").get(frame_idx)
+        frame_label["frame_idx"] = frame_idx
+        frame_label["id"] = v7_frame.get("id")
+        frame_label["name"] = v7_frame.get("name")
+        v7_labels.append(frame_label)
+
+    bitmap_names = get_bitmap_names(v7_labels)
+
+    sly_frames, video_objects, video_tags = [], [], []
+    for v7_label in v7_labels:
+        geometry_type = get_geometry_type(v7_label)
+        convert_func = CONVERT_MAP.get(geometry_type)
+        if convert_func is None:
+            sly.logger.warning(f"Can't find any know geometry type in {v7_label}")
+            continue
+        frame_idx = v7_label.get("frame_idx")
+        sly_figure = convert_func(
+            v7_label,
+            height=video_height,
+            width=video_width,
+            bitmap_names=bitmap_names,
+            frame_idx=frame_idx,
+        )
+        if sly_figure is not None:
+            if geometry_type == "tag":
+                video_tags.append(sly_figure)
+                continue
+
+            if isinstance(sly_figure, list):
+                frame = sly.Frame(frame_idx, figures=sly_figure)
+            else:
+                frame = sly.Frame(frame_idx, figures=[sly_figure])
+
+            sly_frames.append(frame)
+            video_object = sly_figure.video_object
+            if video_object not in video_objects:
+                video_objects.append(video_object)
+
+    objects = sly.VideoObjectCollection(video_objects)
+    frames = sly.FrameCollection(sly_frames)
+
+    sly_ann = sly.VideoAnnotation(
+        img_size=(video_height, video_width),
+        frames_count=frames_count,
+        objects=objects,
+        frames=frames,
+    )
+
+    return sly_ann
+
+
 def get_bitmap_names(v7_labels: List[Dict[str, Any]]) -> Dict[str, str]:
     bitmap_names = {}
     for v7_label in v7_labels:
@@ -505,8 +596,58 @@ def process_image_entities(
     return project_info
 
 
-def process_video_entities():
-    pass
+def process_video_entities(
+    video_entities: List[Tuple[str, str]], api, workspace_id, project_name
+):
+    sly.logger.info(
+        f"Starting processing project {project_name} with {len(video_entities)} videos"
+    )
+
+    project_info = api.project.create(
+        workspace_id,
+        f"From V7 {project_name} (videos)",
+        type=sly.ProjectType.VIDEOS,
+        change_name_if_conflict=True,
+    )
+    sly.logger.debug(f"Created project {project_info.name} with ID {project_info.id}")
+    dataset_info = api.dataset.create(
+        project_info.id,
+        "ds0",
+        change_name_if_conflict=True,
+    )
+    sly.logger.debug(f"Created dataset {dataset_info.name} with ID {dataset_info.id}")
+
+    project_meta = sly.ProjectMeta.from_json(api.project.get_meta(project_info.id))
+    sly.logger.debug(f"Retrieved project meta: {project_meta}")
+
+    sly_anns = []
+    video_names = []
+    video_paths = []
+    for video_path, ann_path in video_entities:
+        v7_ann = sly.json.load_json_file(ann_path)
+        v7_ann = sly.json.load_json_file(ann_path)
+        # ! Debug code, remove it later
+        sly.json.dump_json_file(v7_ann, ann_path)
+        # ! End of debug code
+        sly_ann = v7_video_ann_to_sly(v7_ann, video_path)
+        sly_anns.append(sly_ann)
+        video_name = sly.fs.get_file_name_with_ext(video_path)
+        video_names.append(video_name)
+        video_paths.append(video_path)
+
+        sly_ann: sly.VideoAnnotation
+        for video_object in sly_ann.objects:
+            if video_object.obj_class not in project_meta.obj_classes:
+                project_meta = project_meta.add_obj_class(video_object.obj_class)
+                sly.logger.info(
+                    f"Added object class {video_object.obj_class.name} to project meta"
+                )
+
+    api.project.update_meta(project_info.id, project_meta)
+
+    video_infos = api.video.upload_paths(dataset_info.id, video_names, video_paths)
+    for video_info, sly_ann in zip(video_infos, sly_anns):
+        api.video.annotation.append(video_info.id, sly_ann)
 
 
 CONVERT_MAP = {

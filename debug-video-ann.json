@@ -1,0 +1,69 @@
+{
+    "size": {
+        "height": 240,
+        "width": 426
+    },
+    "description": "",
+    "key": "a53c750d0e8244059999854c51e84688",
+    "tags": [],
+    "objects": [
+        {
+            "key": "a1ea1b0e52764cc19bcfa5961a000fa5",
+            "classTitle": "vid-plane-bbox",
+            "tags": []
+        }
+    ],
+    "frames": [
+        {
+            "index": "0",
+            "figures": [
+                {
+                    "key": "f66dfce6cabf4109abc65ed7e6551afe",
+                    "objectKey": "a1ea1b0e52764cc19bcfa5961a000fa5",
+                    "geometryType": "rectangle",
+                    "geometry": {
+                        "points": {
+                            "exterior": [
+                                [
+                                    368,
+                                    140
+                                ],
+                                [
+                                    414,
+                                    163
+                                ]
+                            ],
+                            "interior": []
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "index": "1",
+            "figures": [
+                {
+                    "key": "b6dac2ccf51f42c88afb54f42868561a",
+                    "objectKey": "f3564bb1c91c4c84bea98a4fbfcd480b",
+                    "geometryType": "rectangle",
+                    "geometry": {
+                        "points": {
+                            "exterior": [
+                                [
+                                    367,
+                                    141
+                                ],
+                                [
+                                    413,
+                                    164
+                                ]
+                            ],
+                            "interior": []
+                        }
+                    }
+                }
+            ]
+        }
+    ],
+    "framesCount": 244
+}
