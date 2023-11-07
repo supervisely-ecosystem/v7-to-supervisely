@@ -2,6 +2,7 @@ import os
 from typing import List, Tuple, Dict, Any, Union, Literal
 import supervisely as sly
 from supervisely.geometry.graph import KeypointsTemplate
+import numpy as np
 
 
 def get_entities_paths(dataset_path: str) -> List[str]:
@@ -221,6 +222,54 @@ def convert_graph(v7_label: Dict[str, Any]) -> sly.Label:
     return sly_label
 
 
+def convert_bitmap(v7_label: Dict[str, Any], **kwargs) -> sly.Label:
+    # TODO: Video support + docstrings
+    height, width = kwargs.get("height"), kwargs.get("width")
+    sly.logger.debug(f"Height: {height}, width: {width} for bitmap conversion")
+
+    class_name = v7_label.get("name")
+    obj_class = sly.ObjClass(name=class_name, geometry_type=sly.Bitmap)
+    raster_layer = v7_label.get("raster_layer")
+    dense_rle = raster_layer.get("dense_rle")
+    sly.logger.debug(f"Converting bitmap: {dense_rle} with class name: {class_name}")
+
+    binary_mask = dense_rle_to_binary_mask(dense_rle, height, width)
+
+    geometry = sly.Bitmap(data=binary_mask)
+
+    sly_label = sly.Label(
+        geometry=geometry,
+        obj_class=obj_class,
+    )
+
+    return sly_label
+
+
+def dense_rle_to_binary_mask(rle: List[int], height: int, width: int) -> np.ndarray:
+    """Converts dense RLE to binary mask.
+    Dense RLE contains pairs of values: value and count of this value.
+    RLE example: [0, 91830, 1, 1, 0, 181449]
+        where pixels from 0 to 91830 are 0
+        then 1 pixel is 1
+        then pixels from 0 to 181449 are 0
+
+    :param rle: mask in dense RLE format
+    :type rle: List[int]
+    :param height: height of mask (image)
+    :type height: int
+    :param width: width of mask (image)
+    :type width: int
+    :return: binary mask, contains 0 and 1 values
+    :rtype: np.ndarray
+    """
+    decoded_rle = []
+    for rle_pair in zip(rle[::2], rle[1::2]):
+        value, count = rle_pair
+        decoded_rle.extend([value] * count)
+    binary_mask = np.array(decoded_rle).reshape((height, width))
+    return binary_mask
+
+
 def convert_tag(v7_label: Dict[str, Any]) -> sly.Tag:
     class_name = v7_label.get("name")
     tag_meta = sly.TagMeta(name=class_name, value_type=sly.TagValueType.NONE)
@@ -265,7 +314,7 @@ def v7_image_ann_to_sly(v7_ann: Dict[str, Any], image_path: str) -> sly.Annotati
         if convert_func is None:
             sly.logger.warning(f"Can't find any know geometry type in {v7_label}")
             continue
-        sly_label = convert_func(v7_label)
+        sly_label = convert_func(v7_label, height=image_height, width=image_width)
         if sly_label is not None:
             if geometry_type == "tag":
                 img_tags.append(sly_label)
@@ -420,4 +469,5 @@ CONVERT_MAP = {
     "tag": convert_tag,
     "keypoint": convert_point,
     "skeleton": convert_graph,
+    "raster_layer": convert_bitmap,
 }

@@ -42,6 +42,7 @@ def retreive_dataset(dataset: RemoteDatasetV2) -> bool:
     export_name = get_export_name()
     sly.logger.info(f"Will try to export dataset {dataset.name} to {export_name}")
     try:
+        dataset: RemoteDatasetV2
         dataset.export(export_name)
         sly.logger.info(
             f"Export {export_name} created successfully, it may take a while "
