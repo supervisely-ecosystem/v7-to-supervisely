@@ -142,7 +142,9 @@ def convert_bbox(
     return sly_label
 
 
-def convert_polyline(v7_label: Dict[str, Any]) -> sly.Label:
+def convert_polyline(
+    v7_label: Dict[str, Any], **kwargs
+) -> Union[sly.Label, sly.VideoFigure]:
     # TODO: Video support + docstrings
     class_name = v7_label.get("name")
     line = v7_label.get("line")
@@ -154,15 +156,20 @@ def convert_polyline(v7_label: Dict[str, Any]) -> sly.Label:
 
     geometry = sly.Polyline(exterior=exterior)
 
-    sly_label = sly.Label(
-        geometry=geometry,
-        obj_class=obj_class,
-    )
+    frame_idx = kwargs.get("frame_idx")
+    if frame_idx is not None:
+        video_object = sly.VideoObject(obj_class)
+        sly_label = sly.VideoFigure(video_object, geometry, frame_idx)
+    else:
+        sly_label = sly.Label(
+            geometry=geometry,
+            obj_class=obj_class,
+        )
 
     return sly_label
 
 
-def convert_polygon(v7_label: Dict[str, Any]) -> sly.Label:
+def convert_polygon(v7_label: Dict[str, Any], **kwargs) -> sly.Label:
     # TODO: Video support + docstrings
     class_name = v7_label.get("name")
     polygon = v7_label.get("polygon")
@@ -174,15 +181,23 @@ def convert_polygon(v7_label: Dict[str, Any]) -> sly.Label:
 
     geometry = sly.Polygon(exterior=exterior)
 
-    sly_label = sly.Label(
-        geometry=geometry,
-        obj_class=obj_class,
-    )
+    frame_idx = kwargs.get("frame_idx")
+
+    if frame_idx is not None:
+        video_object = sly.VideoObject(obj_class)
+        sly_label = sly.VideoFigure(video_object, geometry, frame_idx)
+    else:
+        sly_label = sly.Label(
+            geometry=geometry,
+            obj_class=obj_class,
+        )
 
     return sly_label
 
 
-def convert_point(v7_label: Dict[str, Any]) -> sly.Label:
+def convert_point(
+    v7_label: Dict[str, Any], **kwargs
+) -> Union[sly.Label, sly.VideoFigure]:
     # TODO: Video support + docstrings
     class_name = v7_label.get("name")
     keypoint = v7_label.get("keypoint")
@@ -193,15 +208,22 @@ def convert_point(v7_label: Dict[str, Any]) -> sly.Label:
 
     geometry = sly.Point(row=row, col=col)
 
-    sly_label = sly.Label(
-        geometry=geometry,
-        obj_class=obj_class,
-    )
+    frame_idx = kwargs.get("frame_idx")
+    if frame_idx is not None:
+        video_object = sly.VideoObject(obj_class)
+        sly_label = sly.VideoFigure(video_object, geometry, frame_idx)
+    else:
+        sly_label = sly.Label(
+            geometry=geometry,
+            obj_class=obj_class,
+        )
 
     return sly_label
 
 
-def convert_graph(v7_label: Dict[str, Any]) -> sly.Label:
+def convert_graph(
+    v7_label: Dict[str, Any], **kwargs
+) -> Union[sly.Label, sly.VideoFigure]:
     # TODO: Video support + docstrings
     class_name = v7_label.get("name")
     skeleton = v7_label.get("skeleton")
@@ -225,12 +247,19 @@ def convert_graph(v7_label: Dict[str, Any]) -> sly.Label:
 
     geometry = sly.GraphNodes(sly_nodes)
 
-    sly_label = sly.Label(geometry=geometry, obj_class=obj_class)
+    frame_idx = kwargs.get("frame_idx")
+    if frame_idx is not None:
+        video_object = sly.VideoObject(obj_class)
+        sly_label = sly.VideoFigure(video_object, geometry, frame_idx)
+    else:
+        sly_label = sly.Label(geometry=geometry, obj_class=obj_class)
 
     return sly_label
 
 
-def convert_bitmap(v7_label: Dict[str, Any], **kwargs) -> List[sly.Label]:
+def convert_bitmap(
+    v7_label: Dict[str, Any], **kwargs
+) -> Union[List[sly.Label], List[sly.VideoFigure]]:
     # TODO: Video support + docstrings
     default_name = v7_label.get("name")
     height, width = kwargs.get("height"), kwargs.get("width")
@@ -248,13 +277,18 @@ def convert_bitmap(v7_label: Dict[str, Any], **kwargs) -> List[sly.Label]:
         dense_rle, height, width
     )
 
+    frame_idx = kwargs.get("frame_idx")
     sly_labels = []
     for bitmap_value, binary_mask in binary_masks.items():
         bitmap_id = inverted_mask_annotation_ids_mapping.get(bitmap_value)
         class_name = bitmap_names.get(bitmap_id, default_name)
         obj_class = sly.ObjClass(name=class_name, geometry_type=sly.Bitmap)
         geometry = sly.Bitmap(data=binary_mask)
-        sly_label = sly.Label(geometry=geometry, obj_class=obj_class)
+        if frame_idx is not None:
+            video_object = sly.VideoObject(obj_class)
+            sly_label = sly.VideoFigure(video_object, geometry, frame_idx)
+        else:
+            sly_label = sly.Label(geometry=geometry, obj_class=obj_class)
         sly_labels.append(sly_label)
 
     return sly_labels
@@ -403,12 +437,14 @@ def v7_video_ann_to_sly(v7_ann: Dict[str, Any], video_path: str) -> sly.Annotati
 
     v7_labels = []
     for v7_frame in v7_frames:
-        frame_idx = list(v7_frame.get("frames").keys())[0]
-        frame_label = v7_frame.get("frames").get(frame_idx)
-        frame_label["frame_idx"] = int(frame_idx)
-        frame_label["id"] = v7_frame.get("id")
-        frame_label["name"] = v7_frame.get("name")
-        v7_labels.append(frame_label)
+        frame_indexes = list(v7_frame.get("frames").keys())
+        frames = v7_frame.get("frames")
+        for frame_idx in frame_indexes:
+            frame_label = v7_frame.get("frames").get(frame_idx)
+            frame_label["frame_idx"] = int(frame_idx)
+            frame_label["id"] = v7_frame.get("id")
+            frame_label["name"] = v7_frame.get("name")
+            v7_labels.append(frame_label)
 
     bitmap_names = get_bitmap_names(v7_labels)
 
@@ -434,13 +470,15 @@ def v7_video_ann_to_sly(v7_ann: Dict[str, Any], video_path: str) -> sly.Annotati
 
             if isinstance(sly_figure, list):
                 frame = sly.Frame(frame_idx, figures=sly_figure)
+                video_objects = [sly_figure.video_object for sly_figure in sly_figure]
             else:
                 frame = sly.Frame(frame_idx, figures=[sly_figure])
+                video_objects = [sly_figure.video_object]
 
             sly_frames.append(frame)
-            video_object = sly_figure.video_object
-            if video_object not in video_objects:
-                video_objects.append(video_object)
+            for video_object in video_objects:
+                if video_object not in video_objects:
+                    video_objects.append(video_object)
 
     objects = sly.VideoObjectCollection(video_objects)
     frames = sly.FrameCollection(sly_frames)
