@@ -1,2 +1,2 @@
-darwin-py
-supervisely==6.72.175
+darwin-py==0.8.48
+git+https://github.com/supervisely/supervisely.git@python-dotenv-1.0.0
