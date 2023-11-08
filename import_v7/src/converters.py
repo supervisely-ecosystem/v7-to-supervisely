@@ -342,7 +342,7 @@ def dense_rle_to_binary_mask(
     return binary_masks
 
 
-def convert_tag(v7_label: Dict[str, Any]) -> sly.Tag:
+def convert_tag(v7_label: Dict[str, Any], **kwargs) -> sly.Tag:
     class_name = v7_label.get("name")
     tag_meta = sly.TagMeta(name=class_name, value_type=sly.TagValueType.NONE)
     return sly.Tag(tag_meta)
