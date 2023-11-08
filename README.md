@@ -8,4 +8,4 @@ Use migration tool to automatically convert your V7 datasets to Supervisely form
 
 2. [Import V7](./import_v7/README.md)
 
-<img src=""/>
+<img src="https://github-production-user-asset-6210df.s3.amazonaws.com/118521851/281445527-06753d8e-85e6-4412-9eb6-6ca5b27ccd90.png"/>
