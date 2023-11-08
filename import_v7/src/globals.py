@@ -27,10 +27,8 @@ if sly.is_development():
         sly.logger.warning("One of the .env files is missing. It may cause errors.")
 
 api: sly.Api = sly.Api.from_env()
-SLY_APP_DATA_DIR = sly.app.get_data_dir()
-sly.logger.debug(f"App starting... SLY_APP_DATA_DIR: {SLY_APP_DATA_DIR}")
 
-TEMP_DIR = os.path.join(SLY_APP_DATA_DIR, "temp")
+TEMP_DIR = os.path.join(PARENT_DIR, "temp")
 
 # * Directory, where downloaded as archives V7 datasets will be stored.
 ARCHIVE_DIR = os.path.join(TEMP_DIR, "archives")

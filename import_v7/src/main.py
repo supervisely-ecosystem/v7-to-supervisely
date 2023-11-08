@@ -1,20 +1,13 @@
 import os
-from typing import List, Tuple
+from typing import List, Union
 import supervisely as sly
 
 import globals as g
-import xml.etree.ElementTree as ET
+from converters import process_v7_dataset
 
-from converters import (
-    convert_images_annotations,
-    convert_video_annotations,
-    prepare_images_for_upload,
-    upload_images_task,
-    update_project_meta,
-    images_to_mp4,
-)
 
-MARKER = "annotations.xml"
+IMAGES_DIR = "images"
+RELEASES_DIR = "releases"
 
 
 @sly.handle_exceptions
@@ -22,208 +15,74 @@ def main():
     sly.logger.debug("Starting main function...")
     data_path = download_data()
 
-    project_name = f"From CVAT {os.path.basename(data_path)}"
+    project_name = f"From V7 {os.path.basename(data_path)}"
     sly.logger.info(f"Will use project name: {project_name}")
 
-    images_tasks = []
-    videos_tasks = []
+    images_projects = []
+    videos_projects = []
 
-    for cvat_task in sly.fs.dirs_with_marker(
-        data_path, MARKER, check_function=check_function, ignore_case=True
-    ):
-        sly.logger.debug(f"Found CVAT data in {cvat_task}")
-        annotations_xml_path = os.path.join(cvat_task, MARKER)
-        tree = ET.parse(annotations_xml_path)
+    sly.logger.info(f"Will process V7 directories in {data_path}...")
+
+    for v7_directory in v7_directories(data_path):
+        sly.logger.info(f"Found V7 directory: {v7_directory}, will process it...")
         try:
-            source = tree.find("meta").find("task").find("source").text
-        except Exception:
-            source = None
+            image_project_info, video_project_info = process_v7_dataset(
+                v7_directory, g.api, g.WORKSPACE_ID
+            )
 
-        if not source:
-            images_tasks.append((cvat_task, source))
-        else:
-            videos_tasks.append((cvat_task, source))
+            if image_project_info:
+                sly.logger.info(
+                    f"Created images project {image_project_info.name}, ID: {image_project_info.id}"
+                )
+                images_projects.append(image_project_info)
+            if video_project_info:
+                sly.logger.info(
+                    f"Created videos project {video_project_info.name}, ID: {video_project_info.id}"
+                )
+                videos_projects.append(video_project_info)
+        except Exception as e:
+            sly.logger.warning(
+                f"Error while processing V7 directory: {e}, "
+                "please, check that you provided a valid V7 dataset."
+            )
 
-    sly.logger.debug(
-        f"Found {len(images_tasks)} images tasks and {len(videos_tasks)} videos tasks"
-    )
+    sly.logger.info(f"Finished processing V7 directories in {data_path}.")
 
-    if images_tasks:
-        process_image_tasks(project_name, images_tasks)
-    if videos_tasks:
-        process_video_tasks(project_name, videos_tasks)
-
-    sly.logger.info("Processed all tasks, exiting...")
-
-
-def process_image_tasks(project_name: str, images_tasks: List[str]):
-    sly.logger.info(f"Started processing {len(images_tasks)} images tasks...")
-
-    images_project = g.api.project.create(
-        g.WORKSPACE_ID,
-        project_name + "(images)",
-        type=sly.ProjectType.IMAGES,
-        change_name_if_conflict=True,
-    )
-
-    images_project_meta = sly.ProjectMeta.from_json(
-        g.api.project.get_meta(images_project.id)
-    )
-
-    sly.logger.debug(
-        f"Created project {images_project.name} with id {images_project.id}"
-    )
-
-    sly.logger.debug(f"Will process {len(images_tasks)} images tasks")
-
-    for task_path, _ in images_tasks:
-        images_et, images_paths = read_task_data(task_path)
-
-        sly.logger.debug(f"Read {len(images_paths)} images from {task_path}")
-
-        dataset_name = sly.fs.get_file_name(task_path)
-        sly.logger.debug(f"Will use {dataset_name} as dataset name.")
-
-        task_tags, image_objects = convert_images_annotations(images_et, images_paths)
-
-        sly.logger.debug(
-            f"Prepared labels and tags in Supervisely format for {len(image_objects)} images."
-        )
-
-        images_names, images_paths, images_anns = prepare_images_for_upload(
-            g.api, image_objects, images_project, images_project_meta
-        )
-
-        sly.logger.debug(f"Prepared {len(images_names)} images for upload.")
-
-        uploaded_images = upload_images_task(
-            g.api,
-            dataset_name,
-            images_project,
-            images_names,
-            images_paths,
-            images_anns,
-            task_tags,
-        )
-
+    if images_projects:
+        images_project_names = [project.name for project in images_projects]
+        images_project_ids = [project.id for project in images_projects]
         sly.logger.info(
-            f"Successfully uploaded {len(uploaded_images)} images to dataset {dataset_name}"
-            f"in project {images_project.name}"
+            f"Created following images projects: {images_project_names} with IDs: {images_project_ids}"
+        )
+    if videos_projects:
+        videos_project_names = [project.name for project in videos_projects]
+        videos_project_ids = [project.id for project in videos_projects]
+        sly.logger.info(
+            f"Created following videos projects: {videos_project_names} with IDs: {videos_project_ids}"
         )
 
-    sly.logger.info(f"Finished processing {len(images_tasks)} images tasks.")
-
-
-def process_video_tasks(project_name: str, videos_tasks: List[str]):
-    sly.logger.info(f"Started processing {len(videos_tasks)} videos tasks...")
-
-    videos_project = g.api.project.create(
-        g.WORKSPACE_ID,
-        project_name + "(videos)",
-        type=sly.ProjectType.VIDEOS,
-        change_name_if_conflict=True,
-    )
-
-    videos_project_meta = sly.ProjectMeta.from_json(
-        g.api.project.get_meta(videos_project.id)
-    )
-
-    sly.logger.debug(
-        f"Created project {videos_project.name} with id {videos_project.id}"
-    )
-
-    sly.logger.debug(f"Will process {len(videos_tasks)} videos tasks")
-
-    for task_path, source in videos_tasks:
-        images_et, images_paths = read_task_data(task_path)
-
-        sly.logger.debug(f"Read {len(images_paths)} images from {task_path}")
-
-        dataset_name = sly.fs.get_file_name(task_path)
-        sly.logger.debug(f"Will use {dataset_name} as dataset name.")
-        (
-            video_size,
-            video_frames,
-            video_objects,
-            video_tags,
-        ) = convert_video_annotations(images_et, images_paths)
-
-        sly.logger.debug(f"Found {len(video_frames)} frames in the video.")
-
-        update_project_meta(
-            g.api,
-            videos_project_meta,
-            videos_project.id,
-            labels=video_objects,
-            tags=video_tags,
+    if not images_projects and not videos_projects:
+        sly.logger.warning(
+            "No projects were created. Please, check that you provided a valid V7 dataset."
         )
 
-        source_name = f"{sly.fs.get_file_name(source)}.mp4"
-        video_path = os.path.join(task_path, source_name)
-        sly.logger.debug(f"Will save video to {video_path}.")
-        images_to_mp4(video_path, images_paths, video_size)
-
-        frames = sly.FrameCollection(video_frames)
-        objects = sly.VideoObjectCollection(video_objects)
-        tag_collection = sly.VideoTagCollection(video_tags)
-
-        sly.logger.debug(
-            f"Will create VideoAnnotation object with: {video_size} size, "
-            f"{len(frames)} frames, {len(objects)} objects, {len(tag_collection)} tags."
-        )
-
-        ann = sly.VideoAnnotation(
-            video_size, len(frames), objects, frames, tag_collection
-        )
-
-        sly.logger.debug("VideoAnnotation successfully created.")
-
-        dataset_info = g.api.dataset.create(
-            videos_project.id, dataset_name, change_name_if_conflict=True
-        )
-
-        sly.logger.debug(
-            f"Created dataset {dataset_info.name} in project {videos_project.name}."
-            "Uploading video..."
-        )
-
-        uploaded_video: sly.api.video_api.VideoInfo = g.api.video.upload_path(
-            dataset_info.id, source_name, video_path
-        )
-
-        sly.logger.debug(
-            f"Uploaded video {source_name} to dataset {dataset_info.name}."
-        )
-
-        g.api.video.annotation.append(uploaded_video.id, ann)
-
-        sly.logger.debug(f"Added annotation to video with ID {uploaded_video.id}.")
-
-        sly.logger.debug(
-            f"Successfully uploaded video {uploaded_video.name} to dataset {dataset_info.name}"
-            f"in project {videos_project.name}."
-        )
-
-    sly.logger.info(f"Finished processing {len(videos_tasks)} videos tasks.")
+    sly.logger.info("App finished work.")
 
 
-def check_function(folder_path: str) -> bool:
-    images_dir = os.path.join(folder_path, "images")
-    return os.path.isdir(images_dir) and sly.fs.list_files(images_dir)
-
-
-def read_task_data(task_path: str) -> Tuple[List[ET.Element], List[str]]:
-    annotations_xml_path = os.path.join(task_path, "annotations.xml")
-    tree = ET.parse(annotations_xml_path)
-    images_et = tree.findall("image")
-
-    images_dir = os.path.join(task_path, "images")
-
-    images_paths = [
-        os.path.join(images_dir, image_et.attrib["name"]) for image_et in images_et
+def v7_directories(data_path: str) -> Union[List[str]]:
+    sly.logger.debug(f"Looking for V7 directories in {data_path}...")
+    subdirs = [
+        os.path.join(data_path, subdir) for subdir in sly.fs.get_subdirs(data_path)
     ]
-
-    return images_et, images_paths
+    sly.logger.debug(f"Found subdirs: {subdirs}")
+    if IMAGES_DIR in subdirs and RELEASES_DIR in subdirs:
+        return [data_path]
+    else:
+        for subdir in subdirs:
+            if IMAGES_DIR in sly.fs.get_subdirs(
+                subdir
+            ) and RELEASES_DIR in sly.fs.get_subdirs(subdir):
+                return [subdir]
 
 
 def download_data() -> str:

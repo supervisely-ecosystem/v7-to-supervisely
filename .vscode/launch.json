@@ -27,7 +27,7 @@
             "name": "Headless app",
             "type": "python",
             "request": "launch",
-            "program": "import_app/src/main.py",
+            "program": "import_v7/src/main.py",
             "console": "integratedTerminal",
             "justMyCode": true,
             "env": {
