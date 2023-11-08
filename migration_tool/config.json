@@ -3,7 +3,7 @@
   "version": "2.0.0",
   "name": "V7 to Supervisely Migration Tool",
   "description": "Convert and copy multiple V7 datasets into Supervisely at once.",
-  "docker_image": "supervisely/base-py-sdk:6.72.177",
+  "docker_image": "supervisely/base-py-sdk:6.72.170",
   "categories": ["images", "videos", "import"],
   "icon": "",
   "icon_cover": true,
