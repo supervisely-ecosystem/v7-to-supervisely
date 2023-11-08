@@ -64,11 +64,11 @@ Project with images in Supervisely, containing one dataset with images and annot
 
 **Step 1:** Run the app<br>
 
-<img src=""/><br>
+<img src="https://github-production-user-asset-6210df.s3.amazonaws.com/118521851/281453664-5fd63cc0-3d3b-4e45-a1bf-f742bbe30845.png"/><br>
 
 **Step 2:** Drag and drop the archive or select it in Team Files<br>
 
-<img src=""/><br>
+<img src="https://github-production-user-asset-6210df.s3.amazonaws.com/118521851/281453677-8173ffcc-a2c5-4340-bd9c-e22724ca1104.png"/><br>
 
 **Step 3:** Press the `Run` button<br>
 
@@ -78,7 +78,7 @@ Project with images in Supervisely, containing one dataset with images and annot
 
 **Step 2:** Drag and drop the folder or select it in Team Files<br>
 
-<img src=""/><br>
+<img src="https://github-production-user-asset-6210df.s3.amazonaws.com/118521851/281453688-acbbb096-30c7-4026-adfc-1301638240ff.png"/><br>
 
 **Step 3:** Press the `Run` button<br>
 
