@@ -450,10 +450,6 @@ def v7_image_ann_to_sly(v7_ann: Dict[str, Any], image_path: str) -> sly.Annotati
         geometry_type = get_geometry_type(v7_label)
         convert_func = CONVERT_MAP.get(geometry_type)
         if convert_func is None:
-            if geometry_type == "mask":
-                # This is almost a junk information, so we will skip it
-                # without any warnings in logs.
-                continue
             sly.logger.warning(f"Can't find any know geometry type in {v7_label}")
             continue
         sly_label = convert_func(
@@ -773,4 +769,5 @@ CONVERT_MAP = {
     "keypoint": convert_point,
     "skeleton": convert_graph,
     "raster_layer": convert_bitmap,
+    "mask": None,
 }
