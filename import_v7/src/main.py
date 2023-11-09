@@ -69,20 +69,25 @@ def main():
     sly.logger.info("App finished work.")
 
 
-def v7_directories(data_path: str) -> Union[List[str]]:
+def v7_directories(data_path: str) -> [List[str]]:
     sly.logger.debug(f"Looking for V7 directories in {data_path}...")
+
+    images_dir = os.path.join(data_path, IMAGES_DIR)
+    releases_dir = os.path.join(data_path, RELEASES_DIR)
+
+    if os.path.isdir(images_dir) and os.path.isdir(releases_dir):
+        return [data_path]
+
     subdirs = [
         os.path.join(data_path, subdir) for subdir in sly.fs.get_subdirs(data_path)
     ]
-    sly.logger.debug(f"Found subdirs: {subdirs}")
-    if IMAGES_DIR in subdirs and RELEASES_DIR in subdirs:
-        return [data_path]
-    else:
-        for subdir in subdirs:
-            if IMAGES_DIR in sly.fs.get_subdirs(
-                subdir
-            ) and RELEASES_DIR in sly.fs.get_subdirs(subdir):
-                return [subdir]
+    v7_subdirs = []
+    for subdir in subdirs:
+        if os.path.isdir(os.path.join(subdir, IMAGES_DIR)) and os.path.isdir(
+            os.path.join(subdir, RELEASES_DIR)
+        ):
+            v7_subdirs.append(subdir)
+    return v7_subdirs
 
 
 def download_data() -> str:
