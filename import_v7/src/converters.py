@@ -110,7 +110,17 @@ def split_entities(
 def convert_bbox(
     v7_label: Dict[str, Any], **kwargs
 ) -> Union[sly.Label, sly.VideoFigure]:
-    # TODO: Video support + docstrings
+    """Converts V7 label with bounding box to Supervisely label if frame_idx was not
+    passed in kwargs or to Supervisely video figure if frame_idx was passed.
+
+    Awaiting following **kwargs:
+        frame_idx: int - index of frame in video if it is video label
+
+    :param v7_label: V7 label in JSON format
+    :type v7_label: Dict[str, Any]
+    :return: Supervisely label or video figure
+    :rtype: Union[sly.Label, sly.VideoFigure]
+    """
     class_name = v7_label.get("name")
     bbox = v7_label.get("bounding_box")
     sly.logger.debug(f"Converting bbox: {bbox} with class name: {class_name}")
@@ -145,7 +155,17 @@ def convert_bbox(
 def convert_polyline(
     v7_label: Dict[str, Any], **kwargs
 ) -> Union[sly.Label, sly.VideoFigure]:
-    # TODO: Video support + docstrings
+    """Converts V7 label with polyline to Supervisely label if frame_idx was not
+    passed in kwargs or to Supervisely video figure if frame_idx was passed.
+
+    Awaiting following **kwargs:
+        frame_idx: int - index of frame in video if it is video label
+
+    :param v7_label: V7 label in JSON format
+    :type v7_label: Dict[str, Any]
+    :return: Supervisely label or video figure
+    :rtype: Union[sly.Label, sly.VideoFigure]
+    """
     class_name = v7_label.get("name")
     line = v7_label.get("line")
     sly.logger.debug(f"Converting polyline: {line} with class name: {class_name}")
@@ -169,8 +189,20 @@ def convert_polyline(
     return sly_label
 
 
-def convert_polygon(v7_label: Dict[str, Any], **kwargs) -> sly.Label:
-    # TODO: Video support + docstrings
+def convert_polygon(
+    v7_label: Dict[str, Any], **kwargs
+) -> Union[sly.Label, sly.VideoFigure]:
+    """Converts V7 label with polygon to Supervisely label if frame_idx was not
+    passed in kwargs or to Supervisely video figure if frame_idx was passed.
+
+    Awaiting following **kwargs:
+        frame_idx: int - index of frame in video if it is video label
+
+    :param v7_label: V7 label in JSON format
+    :type v7_label: Dict[str, Any]
+    :return: Supervisely label or video figure
+    :rtype: Union[sly.Label, sly.VideoFigure]
+    """
     class_name = v7_label.get("name")
     polygon = v7_label.get("polygon")
     sly.logger.debug(f"Converting polygon: {polygon} with class name: {class_name}")
@@ -198,7 +230,17 @@ def convert_polygon(v7_label: Dict[str, Any], **kwargs) -> sly.Label:
 def convert_point(
     v7_label: Dict[str, Any], **kwargs
 ) -> Union[sly.Label, sly.VideoFigure]:
-    # TODO: Video support + docstrings
+    """Converts V7 label with point to Supervisely label if frame_idx was not
+    passed in kwargs or to Supervisely video figure if frame_idx was passed.
+
+    Awaiting following **kwargs:
+        frame_idx: int - index of frame in video if it is video label
+
+    :param v7_label: V7 label in JSON format
+    :type v7_label: Dict[str, Any]
+    :return: Supervisely label or video figure
+    :rtype: Union[sly.Label, sly.VideoFigure]
+    """
     class_name = v7_label.get("name")
     keypoint = v7_label.get("keypoint")
     sly.logger.debug(f"Converting keypoint: {keypoint} with class name: {class_name}")
@@ -224,7 +266,17 @@ def convert_point(
 def convert_graph(
     v7_label: Dict[str, Any], **kwargs
 ) -> Union[sly.Label, sly.VideoFigure]:
-    # TODO: Video support + docstrings
+    """Converts V7 label with graph to Supervisely label if frame_idx was not
+    passed in kwargs or to Supervisely video figure if frame_idx was passed.
+
+    Awaiting following **kwargs:
+        frame_idx: int - index of frame in video if it is video label
+
+    :param v7_label: V7 label in JSON format
+    :type v7_label: Dict[str, Any]
+    :return: Supervisely label or video figure
+    :rtype: Union[sly.Label, sly.VideoFigure]
+    """
     class_name = v7_label.get("name")
     skeleton = v7_label.get("skeleton")
     nodes = skeleton.get("nodes")
@@ -260,7 +312,19 @@ def convert_graph(
 def convert_bitmap(
     v7_label: Dict[str, Any], **kwargs
 ) -> Union[List[sly.Label], List[sly.VideoFigure]]:
-    # TODO: Video support + docstrings
+    """Converts V7 label with bitmap to Supervisely label if frame_idx was not
+    passed in kwargs or to Supervisely video figure if frame_idx was passed.
+
+    Awaiting following **kwargs:
+        frame_idx: int - index of frame in video if it is video label
+        height: int - height of bitmap (image)
+        width: int - width of bitmap (image)
+
+    :param v7_label: V7 label in JSON format
+    :type v7_label: Dict[str, Any]
+    :return: Supervisely label or video figure
+    :rtype: Union[sly.Label, sly.VideoFigure]
+    """
     default_name = v7_label.get("name")
     height, width = kwargs.get("height"), kwargs.get("width")
     sly.logger.debug(f"Height: {height}, width: {width} for bitmap conversion")

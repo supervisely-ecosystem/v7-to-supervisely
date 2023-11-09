@@ -1,5 +1,5 @@
 import os
-from typing import List, Union
+from typing import List
 import supervisely as sly
 
 import globals as g
