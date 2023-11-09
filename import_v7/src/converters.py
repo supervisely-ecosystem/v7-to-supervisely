@@ -517,8 +517,6 @@ def v7_video_ann_to_sly(v7_ann: Dict[str, Any], video_path: str) -> sly.Annotati
         geometry_type = get_geometry_type(v7_label)
         convert_func = CONVERT_MAP.get(geometry_type)
         if convert_func is None:
-            if "mask" in v7_label.keys():
-                continue
             sly.logger.warning(f"Can't find any know geometry type in {v7_label}")
             continue
         frame_idx = v7_label.get("frame_idx")
