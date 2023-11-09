@@ -144,7 +144,7 @@ def start_copying() -> None:
                     timer -= 1
 
                 sly.logger.info(f"Retry {retry} to download dataset {dataset.name}...")
-                save_dataset(dataset, retry)
+                return save_dataset(dataset, retry)
             else:
                 # If the archive is empty after 10 retries, return False.
                 sly.logger.warning(
