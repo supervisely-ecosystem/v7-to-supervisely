@@ -516,9 +516,9 @@ def v7_video_ann_to_sly(v7_ann: Dict[str, Any], video_path: str) -> sly.Annotati
     for v7_label in v7_labels:
         geometry_type = get_geometry_type(v7_label)
         convert_func = CONVERT_MAP.get(geometry_type)
-        if convert_func == "unused":
-            continue
-        elif convert_func is None:
+        if convert_func is None:
+            if "mask" in v7_label.keys():
+                continue
             sly.logger.warning(f"Can't find any know geometry type in {v7_label}")
             continue
         frame_idx = v7_label.get("frame_idx")
@@ -771,5 +771,4 @@ CONVERT_MAP = {
     "keypoint": convert_point,
     "skeleton": convert_graph,
     "raster_layer": convert_bitmap,
-    "mask": "unused",
 }
