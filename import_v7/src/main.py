@@ -76,6 +76,7 @@ def v7_directories(data_path: str) -> [List[str]]:
     releases_dir = os.path.join(data_path, RELEASES_DIR)
 
     if os.path.isdir(images_dir) and os.path.isdir(releases_dir):
+        sly.logger.info(f"Found V7 dataset in {data_path}")
         return [data_path]
 
     subdirs = [
@@ -87,7 +88,9 @@ def v7_directories(data_path: str) -> [List[str]]:
             os.path.join(subdir, RELEASES_DIR)
         ):
             v7_subdirs.append(subdir)
-    return v7_subdirs
+
+    sly.logger.info(f"Found V7 directories: {v7_subdirs}")
+    return v7_subdirs if v7_subdirs else []
 
 
 def download_data() -> str:
