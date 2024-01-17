@@ -60,7 +60,7 @@ def retreive_dataset(dataset: RemoteDatasetV2) -> bool:
             export_path = get_export_path(dataset)
             sly.logger.info(f"Export path of dataset {dataset.name}: {export_path}")
             if not os.path.isdir(export_path):
-                sly.logger.error(f"Can't find downloaded dataset in {export_path}")
+                sly.logger.info(f"Can't find downloaded dataset in {export_path}")
                 return False
             return True
         except NotFound:
