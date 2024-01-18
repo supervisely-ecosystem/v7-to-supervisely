@@ -40,17 +40,28 @@ def get_release_path(dataset_path: str) -> str:
     sly.logger.info(f"Looking for the latest release in {dataset_path}")
     releases_directory = os.path.join(dataset_path, "releases")
     releases = filter(
-        lambda x: x.startswith("sly_export_"),
+        lambda x: x.startswith("sly_export"),
         sly.fs.get_subdirs(releases_directory),
     )
     releases = [
         os.path.abspath(os.path.join(releases_directory, release))
         for release in releases
     ]
+    if not releases:
+        sly.logger.warning(
+            "No releases starting with sly_export found, will try use first directory in releases directory."
+        )
+        subdirs = sly.fs.get_subdirs(releases_directory)
+        releases = [
+            os.path.abspath(os.path.join(releases_directory, subdir))
+            for subdir in subdirs
+        ]
     releases = sorted(releases, reverse=True)
+    latest_release_path = releases[0]
     sly.logger.info(f"Found {len(releases)} releases, will use the latest one.")
-    sly.logger.debug(f"Releases: {releases}. Latest release: {releases[0]}")
-    return releases[0]
+    sly.logger.info(f"Latest release path: {latest_release_path}")
+    sly.logger.debug(f"Releases: {releases}. Latest release: {latest_release_path}")
+    return latest_release_path
 
 
 def get_ann_paths(entities_paths: List[str]) -> List[str]:
