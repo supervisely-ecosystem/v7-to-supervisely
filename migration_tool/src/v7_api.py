@@ -82,19 +82,11 @@ def get_export_name():
 
 
 def get_export_path(dataset: RemoteDatasetV2) -> str:
-    return os.path.join(g.DOWNLOAD_DIR, dataset.team, dataset.name)
-
-
-# for dataset in client.list_remote_datasets():
-#     # console.print(type(dataset))
-#     # console.print(dir(dataset))
-
-#     try:
-#         dataset.export(EXPORT_NAME)
-#     except NameTaken:
-#         console.print(f"Export {EXPORT_NAME} already exists")
-#         release = dataset.get_release()
-#         console.print(f"Release: {release}")
-#         console.print(f"Image count: {release.image_count}")
-
-#         dataset.pull(release=release, multi_threaded=False, use_folders=True)
+    # ! Darwin CLI lowers the dataset and team names, while pulling the dataset
+    # which causes the issue, when the dataset could not be found on Linux.
+    # It may be fixed in the next releases, so check it while updating dependencies.
+    dataset_name = dataset.name.lower()
+    team_name = dataset.team.lower()
+    # ! These variables added here only for bringing the attention to the issue.
+    # And can be removed in the future, if Darwin CLI will be fixed.
+    return os.path.join(g.DOWNLOAD_DIR, team_name, dataset_name)
