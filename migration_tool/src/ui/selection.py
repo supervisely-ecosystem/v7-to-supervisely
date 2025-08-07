@@ -9,7 +9,8 @@ from migration_tool.src.v7_api import get_datasets
 datasets_transfer = Transfer(
     filterable=True,
     filter_placeholder="Input dataset name",
-    titles=["Available datasets", "Datasets to copy"],
+    titles=["Available datasets", "Datasets to copy"], 
+    width=300,
 )
 
 select_datasets_button = Button("Select datasets")
