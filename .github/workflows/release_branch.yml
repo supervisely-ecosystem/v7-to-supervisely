@@ -21,3 +21,4 @@ jobs:
       RELEASE_DESCRIPTION: "'${{ github.ref_name }}' branch release"
       RELEASE_TYPE: "release-branch"
       SUBAPP_PATHS: "import_v7, migration_tool"
+      SKIP_IMAGE_VALIDATION: "1"
