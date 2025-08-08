@@ -23,4 +23,3 @@ jobs:
       RELEASE_DESCRIPTION: "${{ github.event.release.name }}"
       RELEASE_TYPE: "release"
       SUBAPP_PATHS: "import_v7, migration_tool"
-      SKIP_IMAGE_VALIDATION: True
