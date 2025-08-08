@@ -4,6 +4,7 @@
   "name": "V7 to Supervisely Migration Tool",
   "description": "Convert and copy multiple V7 datasets into Supervisely at once.",
   "docker_image": "supervisely/v7:0.0.3",
+  "instance_version": "6.14.4",
   "categories": ["images", "videos", "import", "migration"],
   "icon": "https://github.com/supervisely-ecosystem/v7-to-supervisely/assets/119248312/541f15a5-b0ee-4628-a322-8c3137f6553f",
   "icon_cover": true,
