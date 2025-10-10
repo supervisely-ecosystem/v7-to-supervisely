@@ -9,7 +9,7 @@
   <a href="#How-To-Run">How To Run</a>
 </p>
 
-[![](https://img.shields.io/badge/supervisely-ecosystem-brightgreen)](../../../../supervisely-ecosystem/v7-to-supervisely/import_v7)
+[![](https://img.shields.io/badge/supervisely-ecosystem-brightgreen)](../../../../../supervisely-ecosystem/v7-to-supervisely/import_v7)
 [![](https://img.shields.io/badge/slack-chat-green.svg?logo=slack)](https://supervisely.com/slack)
 ![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/supervisely-ecosystem/v7-to-supervisely)
 [![views](https://app.supervisely.com/img/badges/views/supervisely-ecosystem/v7-to-supervisely/import_v7.png)](https://supervisely.com)
@@ -21,7 +21,7 @@
 
 This application allows you convert images and videos with annotations from V7 format to Supervisely format using archive or folder with dataset in Darwin JSON Format format (`Darwin JSON Format` both for images and videos).<br>
 
-\*️⃣ If you want to copy datasets directly from V7 instance you can use fully automated [V7 to Supervisely Migration Tool](../../../../supervisely-ecosystem/v7-to-supervisely/migration_tool) app from Supervisely Ecosystem.<br>
+\*️⃣ If you want to copy datasets directly from V7 instance you can use fully automated [V7 to Supervisely Migration Tool](../../../../../supervisely-ecosystem/v7-to-supervisely/migration_tool) app from Supervisely Ecosystem.<br>
 
 ## Preparation
 
