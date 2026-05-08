@@ -1,0 +1,2 @@
+supervisely==6.73.564
+darwin-py==0.8.48
